@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Flutter (Debug with Supabase)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main.dart",
+        "args": [
+          "--dart-define=SUPABASE_URL=https://ugphaeiqbfejnzpiqdty.supabase.co",
+          "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVncGhhZWlxYmZlam56cGlxZHR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMTMwNDcsImV4cCI6MjA2OTc4OTA0N30.-OcW0or7v6krUQJUG0Jb8VoPbpbGjbdbjsMKn6KplM8"
+        ]
+      },
+      {
+        "name": "Flutter (Run without Debugging)",
+        "request": "launch",
+        "type": "dart",
+        "program": "lib/main.dart",
+        // This is the crucial part to make it run without debugging
+        "noDebug": true,
+        "args": [
+          "--dart-define=SUPABASE_URL=https://ugphaeiqbfejnzpiqdty.supabase.co",
+          "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVncGhhZWlxYmZlam56cGlxZHR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyMTMwNDcsImV4cCI6MjA2OTc4OTA0N30.-OcW0or7v6krUQJUG0Jb8VoPbpbGjbdbjsMKn6KplM8"
+        ]
+      }
+    ]
+  }

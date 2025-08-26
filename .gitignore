@@ -1,0 +1,21 @@
+
+# FVM Version Cache
+.fvm/
+
+# Flutter
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.dart_tool/
+
+# Android
+android/app/build/
+android/app/.cxx/
+android/app/src/main/assets/flutter_assets/
+android/app/.flutter-plugins
+android/app/.flutter-plugins-dependencies
+
+# iOS
+ios/Runner/
+ios/.flutter-plugins
+ios/.flutter-plugins-dependencies
