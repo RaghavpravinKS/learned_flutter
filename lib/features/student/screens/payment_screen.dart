@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learned_flutter/features/student/services/classroom_service.dart';
+import 'package:learned_flutter/features/student/screens/my_classes_screen.dart';
+import 'package:learned_flutter/features/student/providers/student_profile_provider.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> classroom;
@@ -434,10 +436,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             actions: [
               FilledButton(
                 onPressed: () {
+                  // Invalidate providers to refresh data
+                  ref.invalidate(enrolledClassroomsProvider);
+                  ref.invalidate(studentEnrollmentStatsProvider);
+                  ref.invalidate(currentStudentProfileProvider);
+                  
                   context.pop(); // Close dialog
-                  context.go('/student/dashboard'); // Navigate to dashboard
+                  context.go('/student/sessions'); // Navigate to My Classes
                 },
-                child: const Text('Go to Dashboard'),
+                child: const Text('View My Classes'),
               ),
             ],
           ),
