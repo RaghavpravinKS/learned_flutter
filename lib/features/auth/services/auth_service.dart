@@ -20,27 +20,31 @@ class AuthService {
     required String password,
     required Map<String, dynamic> userMetadata,
   }) async {
-    return await _supabase.auth.signUp(
-      email: email,
-      password: password,
-      data: userMetadata,
-    );
+    return await _supabase.auth.signUp(email: email, password: password, data: userMetadata);
   }
 
   // Sign in with email and password
-  Future<AuthResponse> signIn({
-    required String email,
-    required String password,
-  }) async {
-    return await _supabase.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
+  Future<AuthResponse> signIn({required String email, required String password}) async {
+    return await _supabase.auth.signInWithPassword(email: email, password: password);
   }
 
-  // Sign out
+  // Sign out - clears session and all persistent data
   Future<void> signOut() async {
-    await _supabase.auth.signOut();
+    try {
+      // Sign out from Supabase (this automatically clears session and persistent data)
+      await _supabase.auth.signOut();
+
+      // Supabase automatically handles:
+      // - Clearing the session from memory
+      // - Removing persistent auth state from secure storage
+      // - Invalidating refresh tokens
+      // - Triggering auth state change listeners
+
+      print('🔍 AuthService: User signed out successfully');
+    } catch (e) {
+      print('🔍 AuthService: Error during sign out: $e');
+      rethrow;
+    }
   }
 
   // Reset password
@@ -50,22 +54,12 @@ class AuthService {
 
   // Get user profile
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
-    final response = await _supabase
-        .from('user_profiles')
-        .select()
-        .eq('user_id', userId)
-        .single();
+    final response = await _supabase.from('user_profiles').select().eq('user_id', userId).single();
     return response as Map<String, dynamic>?;
   }
 
   // Update user profile
-  Future<void> updateUserProfile({
-    required String userId,
-    required Map<String, dynamic> updates,
-  }) async {
-    await _supabase
-        .from('user_profiles')
-        .update(updates)
-        .eq('user_id', userId);
+  Future<void> updateUserProfile({required String userId, required Map<String, dynamic> updates}) async {
+    await _supabase.from('user_profiles').update(updates).eq('user_id', userId);
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
+import 'package:learned_flutter/features/debug/helpers/auth_debug_helper.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -15,9 +16,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _nameController = TextEditingController(text: 'John Doe');
   final _emailController = TextEditingController(text: 'john.doe@example.com');
   final _phoneController = TextEditingController(text: '+1 (555) 123-4567');
-  final _bioController = TextEditingController(
-    text: 'Passionate learner interested in technology and design.',
-  );
+  final _bioController = TextEditingController(text: 'Passionate learner interested in technology and design.');
 
   @override
   void dispose() {
@@ -36,9 +35,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void _saveProfile() {
     if (_formKey.currentState!.validate()) {
       // TODO: Save profile changes
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully')));
       // Navigate back after a short delay
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
@@ -54,10 +51,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       appBar: AppBar(
         title: const Text('Edit Profile'),
         actions: [
-          TextButton(
-            onPressed: _saveProfile,
-            child: const Text('Save'),
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () => AuthDebugHelper.showAuthDebugDialog(context),
+            tooltip: 'Debug Authentication',
           ),
+          TextButton(onPressed: _saveProfile, child: const Text('Save')),
         ],
       ),
       body: SingleChildScrollView(
@@ -77,37 +76,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.primary.withOpacity(0.1),
-                      border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3),
-                        width: 2,
-                      ),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      size: 60,
-                      color: AppColors.primary,
-                    ),
+                    child: const Icon(Icons.person, size: 60, color: AppColors.primary),
                   ),
                   Positioned(
                     right: 0,
                     bottom: 0,
                     child: Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              
+
               // Form Fields
               _buildFormField(
                 label: 'Full Name',
@@ -121,9 +106,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               _buildFormField(
-                label: 'Email', 
+                label: 'Email',
                 controller: _emailController,
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
@@ -138,7 +123,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               _buildFormField(
                 label: 'Phone Number',
                 controller: _phoneController,
@@ -152,7 +137,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              
+
               // Bio
               TextFormField(
                 controller: _bioController,
@@ -163,17 +148,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   hintText: 'Tell us about yourself...',
                   alignLabelWithHint: true,
                   prefixIcon: const Icon(Icons.info_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Save Button
               SizedBox(
                 width: double.infinity,
@@ -181,17 +161,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   onPressed: _saveProfile,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text(
-                    'Save Changes',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: const Text('Save Changes', style: TextStyle(fontSize: 16)),
                 ),
               ),
-              
+
               // Change Password Button
               TextButton(
                 onPressed: () {
@@ -219,13 +194,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       validator: validator,
     );

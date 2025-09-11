@@ -15,8 +15,8 @@ class AppRoutes {
   static const String studentDashboard = '$student/dashboard';
   static const String studentProfile = '$student/profile';
   static const String studentProfileEdit = '$student/profile/edit';
-  static const String studentClasses = '$student/classes';
-  static const String studentClassDetails = '$student/class';
+  static const String studentSessions = '$student/sessions';
+  static const String studentSessionDetails = '$student/session';
   static const String studentAssignments = '$student/assignments';
   static const String studentAssignmentDetails = '$student/assignment';
   static const String studentSchedule = '$student/schedule';

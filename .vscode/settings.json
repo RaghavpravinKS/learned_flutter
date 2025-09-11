@@ -1,0 +1,6 @@
+{
+    "cmake.ignoreCMakeListsMissing": true,
+    "dart.flutterSdkPath": ".fvm/flutter_sdk",
+    "dart.lineLength": 120,
+    "dart.flutterHotReloadOnSave": "manual"
+}

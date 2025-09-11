@@ -2,27 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
-import 'package:learned_flutter/features/student/models/class_model.dart';
-import 'package:learned_flutter/features/student/providers/class_provider.dart';
+import 'package:learned_flutter/features/student/models/session_model.dart';
+import 'package:learned_flutter/features/student/providers/session_provider.dart';
 import 'package:learned_flutter/routes/app_routes.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
-class ClassDetailsScreen extends ConsumerWidget {
-  final String classId;
-  final ClassModel? initialClassData;
+class SessionDetailsScreen extends ConsumerWidget {
+  final String sessionId;
+  final SessionModel? initialSessionData;
   
-  const ClassDetailsScreen({
+  const SessionDetailsScreen({
     super.key,
-    required this.classId,
-    this.initialClassData,
+    required this.sessionId,
+    this.initialSessionData,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // If we have initial data, use it, otherwise fetch from the provider
-    final classAsync = initialClassData != null
-        ? AsyncValue.data(initialClassData!)
-        : ref.watch(classDetailsProvider(classId));
+    final sessionAsync = initialSessionData != null
+        ? AsyncValue.data(initialSessionData!)
+        : ref.watch(sessionDetailsProvider(sessionId));
 
     return Scaffold(
       body: CustomScrollView(
@@ -32,7 +32,7 @@ class ClassDetailsScreen extends ConsumerWidget {
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                'Class Details',
+                'Session Details',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -56,7 +56,7 @@ class ClassDetailsScreen extends ConsumerWidget {
               onPressed: () => context.pop(),
             ),
           ),
-          classAsync.when(
+          sessionAsync.when(
             loading: () => const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -68,7 +68,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                     const Icon(Icons.error_outline, color: Colors.red, size: 48),
                     const SizedBox(height: 16),
                     const Text(
-                      'Failed to load class details',
+                      'Failed to load session details',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
@@ -79,23 +79,23 @@ class ClassDetailsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => ref.refresh(classDetailsProvider(classId).future),
+                      onPressed: () => ref.refresh(sessionDetailsProvider(sessionId).future),
                       child: const Text('Retry'),
                     ),
                   ],
                 ),
               ),
             ),
-            data: (classData) => _buildClassDetails(classData, context, ref),
+            data: (sessionData) => _buildSessionDetails(sessionData, context, ref),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildClassDetails(ClassModel classData, BuildContext context, WidgetRef ref) {
-    final isUpcoming = classData.startTime.isAfter(DateTime.now());
-    final isLive = classData.isLive;
+  Widget _buildSessionDetails(SessionModel sessionData, BuildContext context, WidgetRef ref) {
+    final isUpcoming = sessionData.startTime.isAfter(DateTime.now());
+    final isLive = sessionData.isLive;
     final canJoin = isUpcoming || isLive;
 
     return SliverList(
@@ -108,14 +108,14 @@ class ClassDetailsScreen extends ConsumerWidget {
             children: [
               // Class Title
               Text(
-                classData.subject,
+                sessionData.subject,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
               ),
               const SizedBox(height: 4),
               Text(
-                'With ${classData.teacherName}',
+                'With ${sessionData.teacherName}',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
@@ -157,7 +157,7 @@ class ClassDetailsScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               
               // Class Details Grid
-              _buildDetailsGrid(classData, context),
+              _buildDetailsGrid(sessionData, context),
               const SizedBox(height: 24),
               
               // Join Button (if applicable)
@@ -166,7 +166,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: isLive
-                        ? () => _joinClass(context, classData.id)
+                        ? () => _joinSession(context, sessionData.id)
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isLive ? AppColors.primary : Colors.grey[300],
@@ -177,7 +177,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                       ),
                     ),
                     child: Text(
-                      isLive ? 'Join Now' : 'Starts at ${_formatTime(classData.startTime)}',
+                      isLive ? 'Join Now' : 'Starts at ${_formatTime(sessionData.startTime)}',
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
@@ -206,7 +206,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                 child: TabBarView(
                   children: [
                     // About Tab
-                    _buildAboutTab(classData, context),
+                    _buildAboutTab(sessionData, context),
                     // Materials Tab
                     _buildMaterialsTab(),
                     // Assignments Tab
@@ -221,7 +221,7 @@ class ClassDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDetailsGrid(ClassModel classData, BuildContext context) {
+  Widget _buildDetailsGrid(SessionModel sessionData, BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -235,13 +235,13 @@ class ClassDetailsScreen extends ConsumerWidget {
           _buildDetailRow(
             Icons.calendar_today_outlined,
             'Date',
-            _formatDate(classData.startTime),
+            _formatDate(sessionData.startTime),
           ),
           const Divider(height: 24),
           _buildDetailRow(
             Icons.access_time_outlined,
             'Time',
-            '${_formatTime(classData.startTime)} - ${_formatTime(classData.endTime)}',
+            '${_formatTime(sessionData.startTime)} - ${_formatTime(sessionData.endTime)}',
           ),
           const Divider(height: 24),
           _buildDetailRow(
@@ -293,23 +293,23 @@ class ClassDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAboutTab(ClassModel classData, BuildContext context) {
+  Widget _buildAboutTab(SessionModel sessionData, BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'About This Class',
+            'About This Session',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
           const SizedBox(height: 12),
           Text(
-            classData.topic.isNotEmpty
-                ? classData.topic
-                : 'No additional information available for this class.',
+            sessionData.topic.isNotEmpty
+                ? sessionData.topic
+                : 'No additional information available for this session.',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[800],
@@ -324,7 +324,7 @@ class ClassDetailsScreen extends ConsumerWidget {
                 ),
           ),
           const SizedBox(height: 12),
-          _buildObjectiveItem('Understand key concepts of ${classData.subject}'),
+          _buildObjectiveItem('Understand key concepts of ${sessionData.subject}'),
           _buildObjectiveItem('Complete practice exercises'),
           _buildObjectiveItem('Get your questions answered'),
         ],
@@ -463,14 +463,14 @@ class ClassDetailsScreen extends ConsumerWidget {
     return months[month - 1];
   }
 
-  Future<void> _joinClass(BuildContext context, String classId) async {
+    Future<void> _joinSession(BuildContext context, String sessionId) async {
     // In a real app, this would navigate to the video call screen
     // For now, we'll just show a dialog
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Join Class'),
-        content: const Text('You are about to join the class session.'),
+        title: const Text('Join Session'),
+        content: const Text('You are about to join the session.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -480,7 +480,7 @@ class ClassDetailsScreen extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(context);
               // Navigate to the active session screen
-              context.push('${AppRoutes.studentSessionActive}/$classId');
+              context.push('${AppRoutes.studentSessionActive}/$sessionId');
             },
             child: const Text('Join'),
           ),

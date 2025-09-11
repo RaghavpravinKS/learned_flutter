@@ -37,6 +37,7 @@ CREATE TABLE students (
     grade_level INTEGER,
     school_name VARCHAR(200),
     learning_goals TEXT,
+    board VARCHAR(100),
     special_requirements TEXT,
     enrollment_date DATE DEFAULT CURRENT_DATE,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
@@ -89,6 +90,7 @@ CREATE TABLE classrooms (
     teacher_id UUID REFERENCES teachers(id) ON DELETE CASCADE,
     name VARCHAR(200) NOT NULL,
     subject VARCHAR(100) NOT NULL,
+    board VARCHAR(100),
     grade_level INTEGER,
     description TEXT,
     max_students INTEGER DEFAULT 1,
@@ -174,13 +176,13 @@ CREATE TABLE student_material_access (
     UNIQUE(student_id, material_id)
 );
 
-CREATE TABLE assessments (
+CREATE TABLE assignments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     classroom_id UUID REFERENCES classrooms(id) ON DELETE CASCADE,
     teacher_id UUID REFERENCES teachers(id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
     description TEXT,
-    assessment_type VARCHAR(50) NOT NULL CHECK (assessment_type IN ('quiz', 'test', 'assignment', 'project')),
+    assignment_type VARCHAR(50) NOT NULL CHECK (assignment_type IN ('quiz', 'test', 'assignment', 'project')),
     total_points INTEGER NOT NULL,
     time_limit_minutes INTEGER,
     due_date TIMESTAMP WITH TIME ZONE,
@@ -190,9 +192,9 @@ CREATE TABLE assessments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE assessment_questions (
+CREATE TABLE assignment_questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assessment_id UUID REFERENCES assessments(id) ON DELETE CASCADE,
+    assignment_id UUID REFERENCES assignments(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
     question_type VARCHAR(50) NOT NULL CHECK (question_type IN ('multiple_choice', 'true_false', 'short_answer', 'essay')),
     options JSONB,
@@ -202,9 +204,9 @@ CREATE TABLE assessment_questions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE student_assessment_attempts (
+CREATE TABLE student_assignment_attempts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    assessment_id UUID REFERENCES assessments(id) ON DELETE CASCADE,
+    assignment_id UUID REFERENCES assignments(id) ON DELETE CASCADE,
     student_id UUID REFERENCES students(id) ON DELETE CASCADE,
     attempt_number INTEGER DEFAULT 1,
     started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -216,7 +218,7 @@ CREATE TABLE student_assessment_attempts (
     feedback TEXT,
     answers JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(assessment_id, student_id, attempt_number)
+    UNIQUE(assignment_id, student_id, attempt_number)
 );
 
 CREATE TABLE payment_plans (
@@ -261,6 +263,26 @@ CREATE TABLE payments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE classroom_pricing (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    classroom_id UUID REFERENCES classrooms(id) ON DELETE CASCADE,
+    payment_plan_id UUID REFERENCES payment_plans(id) ON DELETE CASCADE,
+    price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(classroom_id, payment_plan_id)
+);
+
+CREATE TABLE enrollment_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    classroom_id UUID REFERENCES classrooms(id) ON DELETE CASCADE,
+    request_status VARCHAR(20) DEFAULT 'pending' CHECK (request_status IN ('pending', 'approved', 'rejected', 'paid')),
+    payment_id UUID REFERENCES payments(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(student_id, classroom_id)
+);
+
 CREATE TABLE student_progress (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID REFERENCES students(id) ON DELETE CASCADE,
@@ -303,6 +325,8 @@ CREATE INDEX idx_students_user_id ON students(user_id);
 
 CREATE INDEX idx_students_grade ON students(grade_level);
 
+CREATE INDEX idx_students_board ON students(board);
+
 CREATE INDEX idx_parent_student_relations_parent ON parent_student_relations(parent_id);
 
 CREATE INDEX idx_parent_student_relations_student ON parent_student_relations(student_id);
@@ -314,6 +338,10 @@ CREATE INDEX idx_teachers_status ON teachers(status);
 CREATE INDEX idx_teacher_availability_teacher ON teacher_availability(teacher_id);
 
 CREATE INDEX idx_classrooms_teacher ON classrooms(teacher_id);
+
+CREATE INDEX idx_classrooms_board ON classrooms(board);
+
+CREATE INDEX idx_classrooms_subject ON classrooms(subject);
 
 CREATE INDEX idx_student_assignments_student ON student_classroom_assignments(student_id);
 
@@ -331,15 +359,23 @@ CREATE INDEX idx_learning_materials_teacher ON learning_materials(teacher_id);
 
 CREATE INDEX idx_learning_materials_classroom ON learning_materials(classroom_id);
 
-CREATE INDEX idx_assessments_classroom ON assessments(classroom_id);
+CREATE INDEX idx_assignments_classroom ON assignments(classroom_id);
 
-CREATE INDEX idx_assessment_attempts_student ON student_assessment_attempts(student_id);
+CREATE INDEX idx_assignment_questions_assignment ON assignment_questions(assignment_id);
+
+CREATE INDEX idx_student_assignment_attempts_student ON student_assignment_attempts(student_id);
+
+CREATE INDEX idx_student_assignment_attempts_assignment ON student_assignment_attempts(assignment_id);
 
 CREATE INDEX idx_payments_student ON payments(student_id);
 
 CREATE INDEX idx_payments_status ON payments(payment_status);
 
 CREATE INDEX idx_subscriptions_student ON student_subscriptions(student_id);
+
+CREATE INDEX idx_classroom_pricing_classroom ON classroom_pricing(classroom_id);
+
+CREATE INDEX idx_enrollment_requests_student ON enrollment_requests(student_id);
 
 CREATE INDEX idx_student_progress_student ON student_progress(student_id);
 

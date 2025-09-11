@@ -10,11 +10,8 @@ import '../../../../core/theme/app_colors.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final String? userType;
-  
-  const RegisterScreen({
-    Key? key,
-    this.userType,
-  }) : super(key: key);
+
+  const RegisterScreen({Key? key, this.userType}) : super(key: key);
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -22,10 +19,20 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  // State for student-specific fields
+  String? _selectedGrade;
+  String? _selectedBoard;
+
+  // Options for dropdowns
+  final List<String> _grades = List.generate(12, (index) => 'Grade ${index + 1}');
+  final List<String> _boards = ['CBSE', 'ICSE', 'State Board', 'IB', 'IGCSE'];
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -39,7 +46,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   void initState() {
     super.initState();
     _authService = AuthService();
-    
+
     // Set the user type from the route parameter if provided
     if (widget.userType != null) {
       _userType = widget.userType!;
@@ -48,7 +55,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -67,11 +75,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -118,17 +122,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
-      final fullName = _nameController.text.trim();
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
 
-      // Create user metadata
-      final userMetadata = {'full_name': fullName, 'user_type': _userType};
+      // Create user metadata for Supabase Auth
+      // Using separate first_name and last_name as expected by our trigger function
+      final Map<String, dynamic> userMetadata = {
+        'first_name': firstName,
+        'last_name': lastName,
+        'user_type': _userType,
+        'full_name': '$firstName $lastName',
+      };
+
+      // Add student-specific data if user is a student
+      if (_userType == 'student') {
+        final gradeNumber = _selectedGrade != null ? int.tryParse(_selectedGrade!.replaceAll('Grade ', '')) : null;
+        userMetadata['grade_level'] = gradeNumber;
+        userMetadata['board'] = _selectedBoard;
+      }
 
       // Register user with Supabase
-      final response = await _authService.signUp(
-        email: email,
-        password: password,
-        userMetadata: userMetadata,
-      );
+      final response = await _authService.signUp(email: email, password: password, userMetadata: userMetadata);
 
       if (response.user == null) {
         throw Exception('Failed to create user account');
@@ -155,6 +169,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     } catch (e) {
       _handleAuthError(e);
+      print(e);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -167,10 +182,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Account'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _navigateBackToUserTypeSelection,
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _navigateBackToUserTypeSelection),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -183,42 +195,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // Logo and welcome text
                 Column(
                   children: [
-                    Icon(
-                      Icons.school_outlined,
-                      size: 60,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    Icon(Icons.school_outlined, size: 60, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 16),
-                    Text(
-                      'Create an account',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text('Create an account', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Text(
                       'Join our learning community',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
+                      style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[600]),
                     ),
                   ],
                 ),
                 const SizedBox(height: 32),
 
-                // Name field
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: ValidationBuilder()
-                      .minLength(3, 'Name must be at least 3 characters')
-                      .required('Name is required')
-                      .build(),
+                // First Name and Last Name fields
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _firstNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'First Name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: ValidationBuilder()
+                            .minLength(2, 'First name must be at least 2 characters')
+                            .required('First name is required')
+                            .build(),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _lastNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Last Name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: ValidationBuilder()
+                            .minLength(2, 'Last name must be at least 2 characters')
+                            .required('Last name is required')
+                            .build(),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 
@@ -226,10 +245,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
+                  decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
                   validator: ValidationBuilder()
                       .email('Please enter a valid email')
                       .required('Email is required')
@@ -241,18 +257,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'I am a',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
+                    Text('I am a', style: Theme.of(context).textTheme.bodyMedium),
                     const SizedBox(height: 8),
                     SegmentedButton<String>(
                       segments: const [
-                        ButtonSegment(
-                          value: 'student',
-                          label: Text('Student'),
-                          icon: Icon(Icons.school_outlined),
-                        ),
+                        ButtonSegment(value: 'student', label: Text('Student'), icon: Icon(Icons.school_outlined)),
                         ButtonSegment(
                           value: 'parent',
                           label: Text('Parent'),
@@ -270,16 +279,62 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         selectedForegroundColor: Colors.white,
                       ),
                     ),
-                    // const SizedBox(height: 8),
-                    // Text(
-                    //   'Note: Teacher accounts are created by administrators.',
-                    //   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    //     color: Theme.of(context).colorScheme.error,
-                    //     fontStyle: FontStyle.italic,
-                    //   ),
-                    // ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Note: Teacher accounts are created by administrators.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+
+                // Show grade and board selection only for students
+                if (_userType == 'student') ...[
+                  const SizedBox(height: 16),
+                  // Grade Level Dropdown
+                  DropdownButtonFormField<String>(
+                    value: _selectedGrade,
+                    decoration: const InputDecoration(labelText: 'Grade Level', prefixIcon: Icon(Icons.grade_outlined)),
+                    items: _grades.map((String grade) {
+                      return DropdownMenuItem<String>(value: grade, child: Text(grade));
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedGrade = newValue;
+                      });
+                    },
+                    validator: (value) {
+                      if (_userType == 'student' && (value == null || value.isEmpty)) {
+                        return 'Please select your grade';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Board Dropdown
+                  DropdownButtonFormField<String>(
+                    value: _selectedBoard,
+                    decoration: const InputDecoration(labelText: 'Board', prefixIcon: Icon(Icons.book_outlined)),
+                    items: _boards.map((String board) {
+                      return DropdownMenuItem<String>(value: board, child: Text(board));
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedBoard = newValue;
+                      });
+                    },
+                    validator: (value) {
+                      if (_userType == 'student' && (value == null || value.isEmpty)) {
+                        return 'Please select your board';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+
                 const SizedBox(height: 16),
 
                 // Password field
@@ -290,11 +345,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
+                      icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                       onPressed: () {
                         setState(() {
                           _obscurePassword = !_obscurePassword;
@@ -317,11 +368,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Confirm Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
+                      icon: Icon(_obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                       onPressed: () {
                         setState(() {
                           _obscureConfirmPassword = !_obscureConfirmPassword;
@@ -354,10 +401,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       },
                     ),
                     const Expanded(
-                      child: Text(
-                        'I agree to the Terms of Service and Privacy Policy',
-                        style: TextStyle(fontSize: 14),
-                      ),
+                      child: Text('I agree to the Terms of Service and Privacy Policy', style: TextStyle(fontSize: 14)),
                     ),
                   ],
                 ),
@@ -370,25 +414,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Text(
                           'Create Account',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                 ),
 
@@ -401,13 +437,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     const Text('Already have an account? '),
                     TextButton(
                       onPressed: _isLoading ? null : () => context.go('/login'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                      ),
-                      child: const Text(
-                        'Sign In',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                      child: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),

@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:learned_flutter/features/student/providers/assignment_provider.dart';
+import 'package:learned_flutter/features/student/models/session_model.dart';
+import 'package:learned_flutter/features/student/providers/session_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../routes/app_routes.dart';
-import '../models/class_model.dart';
-import '../providers/class_provider.dart';
 import '../providers/course_progress_provider.dart';
 import '../widgets/course_progress_section.dart';
 import 'assignments_screen.dart';
 import 'my_classes_screen.dart';
 import 'student_profile_screen.dart';
-import '../../debug/screens/database_test_screen.dart';
+import '../../debug/helpers/auth_debug_helper.dart';
 
 class _PageItem {
   final Widget screen;
@@ -27,12 +26,10 @@ class StudentDashboardScreen extends ConsumerStatefulWidget {
   const StudentDashboardScreen({super.key});
 
   @override
-  ConsumerState<StudentDashboardScreen> createState() =>
-      _StudentDashboardScreenState();
+  ConsumerState<StudentDashboardScreen> createState() => _StudentDashboardScreenState();
 }
 
-class _StudentDashboardScreenState
-    extends ConsumerState<StudentDashboardScreen> {
+class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen> {
   int _currentIndex = 0;
   late final PageController _pageController;
   late List<_PageItem> _pages;
@@ -55,26 +52,10 @@ class _StudentDashboardScreenState
     final userName = user?.userMetadata?['full_name'] ?? 'Student';
 
     _pages = [
-      _PageItem(
-        screen: _buildHomeContent(userName),
-        title: 'Home',
-        icon: Icons.home_outlined,
-      ),
-      _PageItem(
-        screen: const AssignmentsScreen(),
-        title: 'Assignments',
-        icon: Icons.assignment_outlined,
-      ),
-      _PageItem(
-        screen: const MyClassesScreen(),
-        title: 'Classes',
-        icon: Icons.school_outlined,
-      ),
-      _PageItem(
-        screen: const StudentProfileScreen(),
-        title: 'Profile',
-        icon: Icons.person_outline,
-      ),
+      _PageItem(screen: _buildHomeContent(userName), title: 'Home', icon: Icons.home_outlined),
+      _PageItem(screen: const AssignmentsScreen(), title: 'Assignments', icon: Icons.assignment_outlined),
+      _PageItem(screen: const MyClassesScreen(), title: 'Classes', icon: Icons.school_outlined),
+      _PageItem(screen: const StudentProfileScreen(), title: 'Profile', icon: Icons.person_outline),
     ];
 
     return Scaffold(
@@ -108,15 +89,11 @@ class _StudentDashboardScreenState
   }
 
   Widget _buildHomeContent(String userName) {
-    final upcomingClassesAsync = ref.watch(upcomingClassesProvider);
+    final upcomingSessions = ref.watch(upcomingSessionsProvider);
 
     // Refresh data on pull-to-refresh
     Future<void> refreshData() async {
-      await Future.wait([
-        ref.refresh(upcomingClassesProvider.future),
-        ref.refresh(upcomingAssignmentsProvider.future),
-        ref.refresh(courseProgressProvider.future),
-      ]);
+      await Future.wait([ref.refresh(courseProgressProvider.future), ref.refresh(upcomingSessionsProvider.future)]);
     }
 
     return RefreshIndicator(
@@ -130,16 +107,7 @@ class _StudentDashboardScreenState
             const SizedBox(height: 24),
             _buildQuickActions(context),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const DatabaseTestScreen()),
-                );
-              },
-              child: const Text('Go to Database Test Page'),
-            ),
-            const SizedBox(height: 24),
-            _buildUpcomingClassesSection(context, upcomingClassesAsync),
+            _buildUpcomingSessionsSection(context, upcomingSessions),
             const SizedBox(height: 24),
             // Course progress section using the provider
             const CourseProgressSection(),
@@ -160,27 +128,14 @@ class _StudentDashboardScreenState
           colors: [AppColors.primary, AppColors.primary.withOpacity(0.9)],
         ),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.school_rounded,
-              size: 32,
-              color: Colors.white,
-            ),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+            child: const Icon(Icons.school_rounded, size: 32, color: Colors.white),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -232,34 +187,47 @@ class _StudentDashboardScreenState
       children: [
         Text(
           'Quick Actions',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
         ),
         const SizedBox(height: 12),
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildQuickActionButton(
-              icon: Icons.calendar_today_rounded,
-              label: 'Schedule',
-              onTap: () => context.go(AppRoutes.studentSchedule),
+            Expanded(
+              child: _buildQuickActionButton(
+                icon: Icons.calendar_today_rounded,
+                label: 'Schedule',
+                onTap: () => context.go(AppRoutes.studentSchedule),
+              ),
             ),
-            _buildQuickActionButton(
-              icon: Icons.library_books_rounded,
-              label: 'Materials',
-              onTap: () => context.go('/student/materials'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionButton(
+                icon: Icons.school_rounded,
+                label: 'Browse Classrooms',
+                onTap: () => context.push('/classrooms'),
+              ),
             ),
-            _buildQuickActionButton(
-              icon: Icons.quiz_rounded,
-              label: 'Tests',
-              onTap: () => context.go('/student/tests'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionButton(
+                icon: Icons.library_books_rounded,
+                label: 'Materials',
+                onTap: () => context.go('/student/materials'),
+              ),
             ),
-            _buildQuickActionButton(
-              icon: Icons.chat_rounded,
-              label: 'Messages',
-              onTap: () => context.go('/student/messages'),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionButton(
+                icon: Icons.quiz_rounded,
+                label: 'Tests',
+                onTap: () => context.go('/student/tests'),
+              ),
             ),
           ],
         ),
@@ -267,55 +235,39 @@ class _StudentDashboardScreenState
     );
   }
 
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: Material(
-        color: Colors.white,
+  Widget _buildQuickActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 2,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        elevation: 2,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: AppColors.primary, size: 24),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(icon, color: AppColors.primary, size: 24),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildUpcomingClassesSection(
-    BuildContext context,
-    AsyncValue<List<ClassModel>> upcomingClassesAsync,
-  ) {
+  Widget _buildUpcomingSessionsSection(BuildContext context, AsyncValue<List<SessionModel>> upcomingSessions) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -323,61 +275,45 @@ class _StudentDashboardScreenState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Upcoming Classes',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+              'Upcoming Sessions',
+              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             TextButton(
-              onPressed: () => context.go(AppRoutes.studentClasses),
+              onPressed: () => context.go(AppRoutes.studentSessions),
               style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-              child: Text(
-                'View All',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
-              ),
+              child: Text('View All', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        upcomingClassesAsync.when(
-          data: (classes) => classes.isEmpty
+        upcomingSessions.when(
+          data: (sessions) => sessions.isEmpty
               ? Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
                   child: Center(
-                    child: Text(
-                      'No upcoming classes',
-                      style: GoogleFonts.poppins(color: Colors.grey.shade600),
-                    ),
+                    child: Text('No upcoming sessions', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
                   ),
                 )
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: classes.length > 3 ? 3 : classes.length,
+                  itemCount: sessions.length > 3 ? 3 : sessions.length,
                   itemBuilder: (context, index) {
-                    final classItem = classes[index];
+                    final classItem = sessions[index];
                     return _buildClassCard(classItem);
                   },
                 ),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stack) => Center(
-            child: Text(
-              'Error loading classes: $error',
-              style: const TextStyle(color: Colors.red),
-            ),
+            child: Text('Error loading classes: $error', style: const TextStyle(color: Colors.red)),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildClassCard(ClassModel classItem) {
+  Widget _buildClassCard(SessionModel classItem) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -395,31 +331,18 @@ class _StudentDashboardScreenState
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    Icons.school_rounded,
-                    color: AppColors.primary,
-                    size: 24,
-                  ),
+                  child: Icon(Icons.school_rounded, color: AppColors.primary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        classItem.subject,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
+                      Text(classItem.subject, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
                       const SizedBox(height: 4),
                       Text(
                         'with ${classItem.teacherName}',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey.shade600,
-                          fontSize: 13,
-                        ),
+                        style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 13),
                       ),
                     ],
                   ),
@@ -434,27 +357,24 @@ class _StudentDashboardScreenState
                   '${_formatTime(classItem.startTime)} - ${_formatTime(classItem.endTime)}',
                 ),
                 const SizedBox(width: 16),
-                _buildInfoRow(
-                  Icons.calendar_today_rounded,
-                  _getDayText(classItem.startTime),
-                ),
+                _buildInfoRow(Icons.calendar_today_rounded, _getDayText(classItem.startTime)),
               ],
             ),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  // Handle join class
-                },
+                onPressed: classItem.isLive
+                    ? () {
+                        context.push('${AppRoutes.studentSessionJoin}/${classItem.id}');
+                      }
+                    : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  backgroundColor: classItem.isLive ? AppColors.primary : Colors.grey[300],
+                  foregroundColor: classItem.isLive ? Colors.white : null,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('Join Class'),
+                child: Text(classItem.isLive ? 'Join Now' : 'Starts at ${_formatTime(classItem.startTime)}'),
               ),
             ),
           ],
@@ -476,15 +396,7 @@ class _StudentDashboardScreenState
     if (dateToCheck == today) return 'Today';
     if (dateToCheck == tomorrow) return 'Tomorrow';
 
-    final weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
+    final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     return weekdays[date.weekday - 1];
   }
 
@@ -493,10 +405,7 @@ class _StudentDashboardScreenState
       children: [
         Icon(icon, size: 16, color: Colors.grey.shade600),
         const SizedBox(width: 4),
-        Text(
-          text,
-          style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 13),
-        ),
+        Text(text, style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 13)),
       ],
     );
   }
@@ -517,29 +426,15 @@ class _StudentDashboardScreenState
                   backgroundColor: Colors.white,
                   child: Text(
                     userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   userName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Text(
-                  'Student',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 14,
-                  ),
-                ),
+                Text('Student', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
               ],
             ),
           ),
@@ -591,6 +486,15 @@ class _StudentDashboardScreenState
           ),
           _buildDrawerItem(
             context,
+            icon: Icons.bug_report,
+            title: 'Debug Authentication',
+            onTap: () {
+              Navigator.pop(context);
+              AuthDebugHelper.showAuthDebugDialog(context);
+            },
+          ),
+          _buildDrawerItem(
+            context,
             icon: Icons.help_outline,
             title: 'Help & Support',
             onTap: () {
@@ -629,12 +533,7 @@ class _StudentDashboardScreenState
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-            offset: const Offset(0, -1),
-          ),
+          BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 10, offset: const Offset(0, -1)),
         ],
       ),
       child: BottomNavigationBar(
@@ -642,11 +541,7 @@ class _StudentDashboardScreenState
         onTap: (index) {
           setState(() {
             _currentIndex = index;
-            _pageController.animateToPage(
-              index,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
+            _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
           });
         },
         backgroundColor: Colors.white,
@@ -656,14 +551,7 @@ class _StudentDashboardScreenState
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        items: _pages
-            .map(
-              (page) => BottomNavigationBarItem(
-                icon: Icon(page.icon),
-                label: page.title,
-              ),
-            )
-            .toList(),
+        items: _pages.map((page) => BottomNavigationBarItem(icon: Icon(page.icon), label: page.title)).toList(),
       ),
     );
   }

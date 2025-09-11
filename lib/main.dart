@@ -7,6 +7,7 @@ import 'core/constants/environment.dart';
 import 'core/services/auth_service.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
+import 'routes/app_routes.dart';
 
 // Provider for Supabase client
 final supabaseProvider = Provider<SupabaseClient>((ref) {

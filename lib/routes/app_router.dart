@@ -9,10 +9,12 @@ import 'package:learned_flutter/features/auth/screens/register_screen.dart';
 import 'package:learned_flutter/features/auth/screens/welcome_screen.dart';
 import 'package:learned_flutter/features/splash/screens/splash_screen.dart';
 import 'package:learned_flutter/features/student/screens/student_dashboard_screen.dart';
+import 'package:learned_flutter/features/student/screens/classroom_list_screen.dart';
+import 'package:learned_flutter/features/student/screens/classroom_detail_screen.dart';
 import 'package:learned_flutter/features/student/screens/student_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/edit_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/my_classes_screen.dart';
-import 'package:learned_flutter/features/student/screens/class_details_screen.dart';
+import 'package:learned_flutter/features/student/screens/session_details_screen.dart';
 import 'package:learned_flutter/features/student/screens/assignments_screen.dart';
 import 'package:learned_flutter/features/student/screens/schedule_screen.dart';
 import 'package:learned_flutter/features/student/screens/join_session_screen.dart';
@@ -21,6 +23,7 @@ import 'package:learned_flutter/features/student/screens/session_feedback_screen
 import 'package:learned_flutter/features/student/screens/progress_screen.dart';
 import 'package:learned_flutter/features/student/screens/learning_materials_screen.dart';
 import 'package:learned_flutter/features/student/screens/material_viewer_screen.dart';
+import 'package:learned_flutter/features/student/screens/payment_screen.dart';
 import 'package:learned_flutter/features/student/models/assignment_model.dart';
 import 'package:learned_flutter/features/debug/screens/database_test_screen.dart';
 
@@ -30,20 +33,33 @@ final router = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
   routes: [
+    // Classrooms route
+    // Classrooms routes
+    GoRoute(
+      path: '/classrooms',
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ClassroomListScreen()),
+      routes: [
+        // Classroom detail route
+        GoRoute(
+          path: ':classroomId',
+          pageBuilder: (context, state) => MaterialPage(
+            key: state.pageKey,
+            child: ClassroomDetailScreen(classroomId: state.pathParameters['classroomId']!),
+          ),
+        ),
+      ],
+    ),
     GoRoute(
       path: '/splash',
-      pageBuilder: (context, state) =>
-          MaterialPage(key: state.pageKey, child: const SplashScreen()),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const SplashScreen()),
     ),
     GoRoute(
       path: '/welcome',
-      pageBuilder: (context, state) =>
-          MaterialPage(key: state.pageKey, child: const WelcomeScreen()),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const WelcomeScreen()),
     ),
     GoRoute(
       path: '/login',
-      pageBuilder: (context, state) =>
-          MaterialPage(key: state.pageKey, child: const LoginScreen()),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const LoginScreen()),
     ),
     GoRoute(
       path: '/register',
@@ -57,13 +73,11 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/forgot-password',
-      pageBuilder: (context, state) =>
-          MaterialPage(key: state.pageKey, child: const ForgotPasswordScreen()),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ForgotPasswordScreen()),
     ),
     GoRoute(
       path: '/reset-password',
-      pageBuilder: (context, state) =>
-          MaterialPage(key: state.pageKey, child: const ResetPasswordScreen()),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ResetPasswordScreen()),
     ),
     GoRoute(
       path: '/verify-email',
@@ -77,41 +91,29 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/select-user-type',
-      pageBuilder: (context, state) => MaterialPage(
-        key: state.pageKey,
-        child: const UserTypeSelectionScreen(),
-      ),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const UserTypeSelectionScreen()),
     ),
     // Student routes
     GoRoute(
       path: '/student',
-      pageBuilder: (context, state) => MaterialPage(
-        key: state.pageKey,
-        child: const StudentDashboardScreen(),
-      ),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const StudentDashboardScreen()),
       routes: [
         // Dashboard
         GoRoute(
           path: 'dashboard',
-          pageBuilder: (context, state) => MaterialPage(
-            key: state.pageKey,
-            child: const StudentDashboardScreen(),
-          ),
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const StudentDashboardScreen()),
         ),
-        // My Classes
+        // My Sessions
         GoRoute(
-          path: 'classes',
-          pageBuilder: (context, state) =>
-              MaterialPage(key: state.pageKey, child: const MyClassesScreen()),
+          path: 'sessions',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const MyClassesScreen()),
           routes: [
-            // Class Details
+            // Session Details
             GoRoute(
-              path: ':classId',
+              path: ':sessionId',
               pageBuilder: (context, state) => MaterialPage(
                 key: state.pageKey,
-                child: ClassDetailsScreen(
-                  classId: state.pathParameters['classId']!,
-                ),
+                child: SessionDetailsScreen(sessionId: state.pathParameters['sessionId']!),
               ),
             ),
             // Join Class
@@ -121,9 +123,7 @@ final router = GoRouter(
                 key: state.pageKey,
                 child: Scaffold(
                   appBar: AppBar(title: const Text('Join a Class')),
-                  body: const Center(
-                    child: Text('Join Class Screen - Coming Soon'),
-                  ),
+                  body: const Center(child: Text('Join Class Screen - Coming Soon')),
                 ),
               ),
             ),
@@ -135,9 +135,7 @@ final router = GoRouter(
                 key: state.pageKey,
                 child: Scaffold(
                   appBar: AppBar(title: const Text('Class Calendar')),
-                  body: const Center(
-                    child: Text('Calendar View - Coming Soon'),
-                  ),
+                  body: const Center(child: Text('Calendar View - Coming Soon')),
                 ),
               ),
             ),
@@ -146,8 +144,7 @@ final router = GoRouter(
         // Schedule
         GoRoute(
           path: 'schedule',
-          pageBuilder: (context, state) =>
-              MaterialPage(key: state.pageKey, child: const ScheduleScreen()),
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ScheduleScreen()),
           routes: [
             // Join Session
             GoRoute(
@@ -157,10 +154,7 @@ final router = GoRouter(
                 final sessionData = state.extra as Map<String, dynamic>?;
                 return MaterialPage(
                   key: state.pageKey,
-                  child: JoinSessionScreen(
-                    sessionId: sessionId,
-                    sessionData: sessionData,
-                  ),
+                  child: JoinSessionScreen(sessionId: sessionId, sessionData: sessionData),
                 );
               },
               routes: [
@@ -172,10 +166,7 @@ final router = GoRouter(
                     final sessionData = state.extra as Map<String, dynamic>?;
                     return MaterialPage(
                       key: state.pageKey,
-                      child: ActiveSessionScreen(
-                        sessionId: sessionId,
-                        sessionData: sessionData,
-                      ),
+                      child: ActiveSessionScreen(sessionId: sessionId, sessionData: sessionData),
                     );
                   },
                   routes: [
@@ -184,14 +175,10 @@ final router = GoRouter(
                       path: 'feedback',
                       pageBuilder: (context, state) {
                         final sessionId = state.pathParameters['sessionId']!;
-                        final sessionData =
-                            state.extra as Map<String, dynamic>?;
+                        final sessionData = state.extra as Map<String, dynamic>?;
                         return MaterialPage(
                           key: state.pageKey,
-                          child: SessionFeedbackScreen(
-                            sessionId: sessionId,
-                            sessionData: sessionData,
-                          ),
+                          child: SessionFeedbackScreen(sessionId: sessionId, sessionData: sessionData),
                         );
                       },
                     ),
@@ -205,17 +192,13 @@ final router = GoRouter(
         // Progress
         GoRoute(
           path: 'progress',
-          pageBuilder: (context, state) =>
-              MaterialPage(key: state.pageKey, child: const ProgressScreen()),
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ProgressScreen()),
         ),
 
         // Learning Materials
         GoRoute(
           path: 'materials',
-          pageBuilder: (context, state) => MaterialPage(
-            key: state.pageKey,
-            child: const LearningMaterialsScreen(),
-          ),
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const LearningMaterialsScreen()),
           routes: [
             // Material Viewer
             GoRoute(
@@ -225,10 +208,7 @@ final router = GoRouter(
                 final materialData = state.extra as Map<String, dynamic>?;
                 return MaterialPage(
                   key: state.pageKey,
-                  child: MaterialViewerScreen(
-                    materialId: materialId,
-                    materialData: materialData,
-                  ),
+                  child: MaterialViewerScreen(materialId: materialId, materialData: materialData),
                 );
               },
             ),
@@ -238,10 +218,7 @@ final router = GoRouter(
         // Assignments
         GoRoute(
           path: 'assignments',
-          pageBuilder: (context, state) => MaterialPage(
-            key: state.pageKey,
-            child: const AssignmentsScreen(),
-          ),
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const AssignmentsScreen()),
           routes: [
             // Assignment submission route
             GoRoute(
@@ -250,11 +227,7 @@ final router = GoRouter(
                 key: state.pageKey,
                 child: Scaffold(
                   appBar: AppBar(title: const Text('Submit Assignment')),
-                  body: const Center(
-                    child: Text(
-                      'Assignment submission form will be implemented here',
-                    ),
-                  ),
+                  body: const Center(child: Text('Assignment submission form will be implemented here')),
                 ),
               ),
             ),
@@ -272,13 +245,7 @@ final router = GoRouter(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (assignment != null) ...[
-                            Text(
-                              assignment.title,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            Text(assignment.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 16),
                             Text('Status: ${assignment.status}'),
                             const SizedBox(height: 24),
@@ -303,18 +270,12 @@ final router = GoRouter(
         // Profile
         GoRoute(
           path: 'profile',
-          pageBuilder: (context, state) => MaterialPage(
-            key: state.pageKey,
-            child: const StudentProfileScreen(),
-          ),
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const StudentProfileScreen()),
           routes: [
             // Edit Profile
             GoRoute(
               path: 'edit',
-              pageBuilder: (context, state) => MaterialPage(
-                key: state.pageKey,
-                child: const EditProfileScreen(),
-              ),
+              pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const EditProfileScreen()),
             ),
             // Session
             GoRoute(
@@ -333,11 +294,7 @@ final router = GoRouter(
                 key: state.pageKey,
                 child: Scaffold(
                   appBar: AppBar(title: const Text('Active Session')),
-                  body: Center(
-                    child: Text(
-                      'Active Session ID: ${state.pathParameters['sessionId']}',
-                    ),
-                  ),
+                  body: Center(child: Text('Active Session ID: ${state.pathParameters['sessionId']}')),
                 ),
               ),
             ),
@@ -347,11 +304,7 @@ final router = GoRouter(
                 key: state.pageKey,
                 child: Scaffold(
                   appBar: AppBar(title: const Text('Session Feedback')),
-                  body: Center(
-                    child: Text(
-                      'Feedback for Session ID: ${state.pathParameters['sessionId']}',
-                    ),
-                  ),
+                  body: Center(child: Text('Feedback for Session ID: ${state.pathParameters['sessionId']}')),
                 ),
               ),
             ),
@@ -362,9 +315,7 @@ final router = GoRouter(
           path: 'notifications',
           pageBuilder: (context, state) => MaterialPage(
             key: state.pageKey,
-            child: const Scaffold(
-              body: Center(child: Text('Notifications Screen - Coming Soon')),
-            ),
+            child: const Scaffold(body: Center(child: Text('Notifications Screen - Coming Soon'))),
           ),
         ),
         // Settings
@@ -372,9 +323,7 @@ final router = GoRouter(
           path: 'settings',
           pageBuilder: (context, state) => MaterialPage(
             key: state.pageKey,
-            child: const Scaffold(
-              body: Center(child: Text('Settings Screen - Coming Soon')),
-            ),
+            child: const Scaffold(body: Center(child: Text('Settings Screen - Coming Soon'))),
           ),
         ),
       ],
@@ -382,14 +331,33 @@ final router = GoRouter(
 
     // Home route (redirects to student dashboard for now)
     GoRoute(path: '/home', redirect: (context, state) => '/student'),
-    
+
+    // Payment route
+    GoRoute(
+      path: '/payment',
+      pageBuilder: (context, state) {
+        final extraData = state.extra as Map<String, dynamic>?;
+        final classroom = extraData?['classroom'] as Map<String, dynamic>?;
+        final action = extraData?['action'] as String? ?? 'enrollment';
+
+        if (classroom == null) {
+          return MaterialPage(
+            key: state.pageKey,
+            child: const Scaffold(body: Center(child: Text('Invalid payment request'))),
+          );
+        }
+
+        return MaterialPage(
+          key: state.pageKey,
+          child: PaymentScreen(classroom: classroom, action: action),
+        );
+      },
+    ),
+
     // Debug routes
     GoRoute(
       path: '/debug/db-test',
-      pageBuilder: (context, state) => MaterialPage(
-        key: state.pageKey,
-        child: const DatabaseTestScreen(),
-      ),
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const DatabaseTestScreen()),
     ),
   ],
   errorPageBuilder: (context, state) => MaterialPage(

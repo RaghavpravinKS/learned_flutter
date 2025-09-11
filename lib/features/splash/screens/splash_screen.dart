@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -10,15 +11,54 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  String _statusText = 'Loading...';
+
   @override
   void initState() {
     super.initState();
-    // Navigate to welcome screen after 2 seconds
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        context.go('/welcome');
-      }
+    // Check authentication state and navigate accordingly
+    _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    // Update status
+    setState(() {
+      _statusText = 'Checking authentication...';
     });
+
+    // Wait for 2 seconds to show the splash screen
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    // Check if user is already authenticated
+    final user = Supabase.instance.client.auth.currentUser;
+    final session = Supabase.instance.client.auth.currentSession;
+
+    // Debug print to see authentication state
+    print('🔍 Splash: Checking authentication...');
+    print('🔍 Splash: User exists: ${user != null}');
+    print('🔍 Splash: Session exists: ${session != null}');
+    print('🔍 Splash: User ID: ${user?.id}');
+    print('🔍 Splash: Session expires at: ${session?.expiresAt}');
+
+    if (user != null && session != null) {
+      // User is authenticated, go directly to student dashboard
+      print('🔍 Splash: User authenticated, navigating to dashboard');
+      setState(() {
+        _statusText = 'Welcome back!';
+      });
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) context.go('/student');
+    } else {
+      // User not authenticated, go to welcome screen
+      print('🔍 Splash: User not authenticated, navigating to welcome');
+      setState(() {
+        _statusText = 'Welcome to LearnED';
+      });
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) context.go('/welcome');
+    }
   }
 
   @override
@@ -30,30 +70,22 @@ class _SplashScreenState extends State<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // App logo/icon would go here
-            const Icon(
-              Icons.school_outlined,
-              size: 100,
-              color: Colors.white,
-            ),
+            const Icon(Icons.school_outlined, size: 100, color: Colors.white),
             const SizedBox(height: 24),
             // App name
             Text(
               'LearnED',
-              style: GoogleFonts.poppins(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 8),
             // Tagline
-            Text(
-              'Empowering Education',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.white70,
-              ),
-            ),
+            Text('Empowering Education', style: GoogleFonts.poppins(fontSize: 16, color: Colors.white70)),
+            const SizedBox(height: 32),
+            // Status text
+            Text(_statusText, style: GoogleFonts.poppins(fontSize: 14, color: Colors.white60)),
+            const SizedBox(height: 16),
+            // Loading indicator
+            const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
           ],
         ),
       ),

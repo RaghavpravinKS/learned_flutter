@@ -60,7 +60,7 @@ class CourseProgressSection extends ConsumerWidget {
                       final course = courses[index];
                       return GestureDetector(
                         onTap: () => context.go(
-                          '${AppRoutes.studentClassDetails}/${course.courseId}',
+                          '${AppRoutes.studentSessionDetails}/${course.courseId}',
                         ),
                         child: _buildCourseProgressCard(course, context),
                       );
