@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learned_flutter/features/student/providers/classroom_provider.dart';
 
-import '../services/classroom_service.dart';
-
 class ClassroomListScreen extends ConsumerStatefulWidget {
   const ClassroomListScreen({super.key});
 
@@ -208,7 +206,7 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
               ],
               const SizedBox(height: 8),
               Text(
-                'Taught by: ${classroom['teacher_name'] ?? 'Unknown Teacher'}',
+                'Taught by: ${classroom['teacher_name'] ?? 'Teacher Info Unavailable'}',
                 style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               if (classroom['description'] != null) ...[

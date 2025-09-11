@@ -5,6 +5,108 @@ class ClassroomService {
   final SupabaseClient _supabase = Supabase.instance.client;
   final StudentService _studentService = StudentService();
 
+  /// Helper method to resolve teacher name with robust fallback logic
+  String _resolveTeacherName(Map<String, dynamic> classroom) {
+    try {
+      // Try to get teacher info from the nested teachers relationship
+      final teacher = classroom['teachers'] as Map<String, dynamic>?;
+      
+      if (teacher != null) {
+        // Try to get user data from teacher
+        final teacherUser = teacher['users'] as Map<String, dynamic>?;
+        
+        if (teacherUser != null) {
+          final firstName = teacherUser['first_name'] as String?;
+          final lastName = teacherUser['last_name'] as String?;
+          
+          if (firstName != null && firstName.isNotEmpty) {
+            final fullName = lastName != null && lastName.isNotEmpty 
+                ? '$firstName $lastName' 
+                : firstName;
+            print('🔍 _resolveTeacherName: Found teacher name: $fullName');
+            return fullName;
+          }
+        }
+        
+        // Fallback to teacher_id if available
+        final teacherId = teacher['teacher_id'] as String?;
+        if (teacherId != null && teacherId.isNotEmpty) {
+          print('🔍 _resolveTeacherName: Using teacher_id fallback: $teacherId');
+          return 'Teacher $teacherId';
+        }
+        
+        // Fallback to teacher id
+        final id = teacher['id'] as String?;
+        if (id != null) {
+          print('🔍 _resolveTeacherName: Using teacher id fallback');
+          return 'Teacher ${id.substring(0, 8)}...';
+        }
+      }
+      
+      // Try to get teacher info directly from classroom if no nested relationship
+      final teacherId = classroom['teacher_id'] as String?;
+      if (teacherId != null && teacherId.isNotEmpty) {
+        print('🔍 _resolveTeacherName: Using classroom teacher_id: $teacherId');
+        return 'Teacher ${teacherId.substring(0, 8)}...';
+      }
+      
+      print('🔍 _resolveTeacherName: No teacher info found, using default');
+      return 'Teacher Info Unavailable';
+      
+    } catch (e) {
+      print('🔍 _resolveTeacherName: Error resolving teacher name: $e');
+      return 'Teacher Info Unavailable';
+    }
+  }
+
+  /// Attempts to get teacher name directly from database if relationship fails
+  Future<String> _getTeacherNameDirectly(String? teacherId) async {
+    if (teacherId == null || teacherId.isEmpty) {
+      return 'Teacher Info Unavailable';
+    }
+    
+    try {
+      // Query teacher and user data separately
+      final teacherResponse = await _supabase
+          .from('teachers')
+          .select('''
+            id,
+            teacher_id,
+            user_id,
+            users(first_name, last_name)
+          ''')
+          .eq('id', teacherId)
+          .maybeSingle();
+      
+      if (teacherResponse != null) {
+        final teacherUser = teacherResponse['users'] as Map<String, dynamic>?;
+        if (teacherUser != null) {
+          final firstName = teacherUser['first_name'] as String?;
+          final lastName = teacherUser['last_name'] as String?;
+          
+          if (firstName != null && firstName.isNotEmpty) {
+            final fullName = lastName != null && lastName.isNotEmpty 
+                ? '$firstName $lastName' 
+                : firstName;
+            print('🔍 _getTeacherNameDirectly: Found teacher name: $fullName');
+            return fullName;
+          }
+        }
+        
+        // Use teacher_id as fallback
+        final tId = teacherResponse['teacher_id'] as String?;
+        if (tId != null && tId.isNotEmpty) {
+          return 'Teacher $tId';
+        }
+      }
+      
+      return 'Teacher ${teacherId.substring(0, 8)}...';
+    } catch (e) {
+      print('🔍 _getTeacherNameDirectly: Error: $e');
+      return 'Teacher ${teacherId.substring(0, 8)}...';
+    }
+  }
+
   // Fetch all available classrooms with their payment plans
   Future<List<Map<String, dynamic>>> getAvailableClassrooms({String? subject, String? board, int? gradeLevel}) async {
     try {
@@ -66,23 +168,18 @@ class ClassroomService {
           classroom['student_count'] = 0;
         }
 
-        // Format teacher name
-        final teacher = classroom['teachers'] as Map<String, dynamic>?;
-
-        if (teacher != null) {
-          final teacherUser = teacher['users'] as Map<String, dynamic>?;
-
-          if (teacherUser != null && teacherUser['first_name'] != null) {
-            classroom['teacher_name'] = '${teacherUser['first_name']} ${teacherUser['last_name']}';
-          } else if (teacher['teacher_id'] != null) {
-            // Use teacher_id as fallback
-            classroom['teacher_name'] = 'Teacher ${teacher['teacher_id']}';
-          } else {
-            classroom['teacher_name'] = 'Teacher Info Unavailable';
+        // Format teacher name with improved fallback logic
+        String teacherName = _resolveTeacherName(classroom);
+        
+        // If we couldn't resolve the teacher name from the relationship, try direct query
+        if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
+          final teacherId = classroom['teacher_id'] as String?;
+          if (teacherId != null) {
+            teacherName = await _getTeacherNameDirectly(teacherId);
           }
-        } else {
-          classroom['teacher_name'] = 'No Teacher Assigned';
         }
+        
+        classroom['teacher_name'] = teacherName;
       }
 
       print('🔍 Returning ${classrooms.length} processed classrooms');
@@ -167,20 +264,18 @@ class ClassroomService {
       response['teachers'] = teacherData;
       response['classroom_pricing'] = pricingData;
 
-      // Format teacher name
-      if (teacherData != null) {
-        final teacherUser = teacherData['users'] as Map<String, dynamic>?;
-        if (teacherUser != null) {
-          response['teacher_name'] = '${teacherUser['first_name']} ${teacherUser['last_name']}';
-          print('🔍 getClassroomById: Teacher name set to: ${response['teacher_name']}');
-        } else {
-          response['teacher_name'] = 'Unknown Teacher';
-          print('🔍 getClassroomById: No teacher user data found, using default name');
+      // Format teacher name using the helper method
+      String teacherName = _resolveTeacherName(response);
+      
+      // If we couldn't resolve the teacher name from the relationship, try direct query
+      if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
+        final teacherId = response['teacher_id'] as String?;
+        if (teacherId != null) {
+          teacherName = await _getTeacherNameDirectly(teacherId);
         }
-      } else {
-        response['teacher_name'] = 'No Teacher Assigned';
-        print('🔍 getClassroomById: No teacher data found');
       }
+      
+      response['teacher_name'] = teacherName;
 
       print('🔍 getClassroomById: Returning processed classroom data with ${response.keys.length} keys');
       return response;
@@ -372,13 +467,15 @@ class ClassroomService {
           for (final assignment in assignments) {
             final classroom = assignment['classrooms'] as Map<String, dynamic>?;
             if (classroom != null) {
-              final teacher = classroom['teachers'] as Map<String, dynamic>?;
-              final teacherUser = teacher?['users'] as Map<String, dynamic>?;
-
-              // Build teacher name
-              String teacherName = 'Unknown Teacher';
-              if (teacherUser != null && teacherUser['first_name'] != null && teacherUser['last_name'] != null) {
-                teacherName = '${teacherUser['first_name']} ${teacherUser['last_name']}';
+              // Build teacher name using helper method
+              String teacherName = _resolveTeacherName(classroom);
+              
+              // If we couldn't resolve the teacher name from the relationship, try direct query
+              if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
+                final teacherId = classroom['teacher_id'] as String?;
+                if (teacherId != null) {
+                  teacherName = await _getTeacherNameDirectly(teacherId);
+                }
               }
 
               enrolledClassrooms.add({
@@ -435,17 +532,23 @@ class ClassroomService {
         for (final assignment in assignments) {
           final classroom = assignment['classrooms'] as Map<String, dynamic>?;
           if (classroom != null) {
-            final teacher = classroom['teachers'] as Map<String, dynamic>?;
-            final teacherUser = teacher?['users'] as Map<String, dynamic>?;
-
+            // Use helper method for teacher name resolution
+            String teacherName = _resolveTeacherName(classroom);
+            
+            // If we couldn't resolve the teacher name from the relationship, try direct query
+            if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
+              final teacherId = classroom['teacher_id'] as String?;
+              if (teacherId != null) {
+                teacherName = await _getTeacherNameDirectly(teacherId);
+              }
+            }
+            
             enrolledClassrooms.add({
               'id': classroom['id'],
               'name': classroom['name'],
               'subject': classroom['subject'],
               'grade_level': classroom['grade_level'],
-              'teacher_name': teacherUser != null
-                  ? '${teacherUser['first_name']} ${teacherUser['last_name']}'
-                  : 'Unknown Teacher',
+              'teacher_name': teacherName,
               'enrollment_date': assignment['enrolled_date'],
               'progress': 0.5, // Default progress
               'next_session': DateTime.now().add(const Duration(hours: 24)).toIso8601String(),

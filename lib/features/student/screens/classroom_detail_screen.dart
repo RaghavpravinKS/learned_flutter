@@ -178,7 +178,7 @@ class ClassroomDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                classroom['teacher_name'] ?? 'Unknown Teacher',
+                                classroom['teacher_name'] ?? 'Teacher Info Unavailable',
                                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               if (teacher['qualifications'] != null) ...[
