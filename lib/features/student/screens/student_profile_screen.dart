@@ -65,8 +65,7 @@ class StudentProfileScreen extends ConsumerWidget {
                   SizedBox(height: 16),
                   Text('No student profile found', style: TextStyle(fontSize: 16)),
                   SizedBox(height: 8),
-                  Text('Please contact support if this issue persists', 
-                       style: TextStyle(color: Colors.grey)),
+                  Text('Please contact support if this issue persists', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             );
@@ -98,114 +97,116 @@ class StudentProfileScreen extends ConsumerWidget {
                     return enrollmentStatsAsync.when(
                       loading: () => _buildProgressOverview(0, 0, 0),
                       error: (error, stack) => _buildProgressOverview(0, 0, 0),
-                      data: (stats) => _buildProgressOverview(
-                        stats['completed'] ?? 0,
-                        stats['active'] ?? 0,
-                        stats['total'] ?? 0,
-                      ),
+                      data: (stats) =>
+                          _buildProgressOverview(stats['completed'] ?? 0, stats['active'] ?? 0, stats['total'] ?? 0),
                     );
                   },
                 ),
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // Account Settings
-            _buildSectionTitle('Account Settings'),
-            _buildSettingItem(
-              icon: Icons.person_outline,
-              title: 'Personal Information',
-              onTap: () {
-                // Navigate to personal info screen
-              },
-            ),
-            _buildSettingItem(
-              icon: Icons.lock_outline,
-              title: 'Change Password',
-              onTap: () {
-                // Navigate to change password screen
-              },
-            ),
-            _buildSettingItem(
-              icon: Icons.notifications_none,
-              title: 'Notification Settings',
-              onTap: () {
-                // Navigate to notification settings
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Support
-            _buildSectionTitle('Support'),
-            _buildSettingItem(
-              icon: Icons.help_outline,
-              title: 'Help Center',
-              onTap: () {
-                // Navigate to help center
-              },
-            ),
-            _buildSettingItem(
-              icon: Icons.email_outlined,
-              title: 'Contact Support',
-              onTap: () {
-                // Navigate to contact support
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Logout Button
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  try {
-                    // Show confirmation dialog
-                    final shouldLogout = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Logout'),
-                        content: const Text('Are you sure you want to logout?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            style: TextButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('Logout'),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (shouldLogout == true) {
-                      // Sign out from Supabase (clears session and persistent data)
-                      await Supabase.instance.client.auth.signOut();
-
-                      if (context.mounted) {
-                        // Navigate to login screen
-                        context.go(AppRoutes.login);
-
-                        // Show success message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Logged out successfully'), backgroundColor: Colors.green),
-                        );
-                      }
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(SnackBar(content: Text('Error logging out: $e'), backgroundColor: Colors.red));
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade50,
-                  foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                // Account Settings
+                _buildSectionTitle('Account Settings'),
+                _buildSettingItem(
+                  icon: Icons.person_outline,
+                  title: 'Personal Information',
+                  onTap: () {
+                    // Navigate to personal info screen
+                  },
                 ),
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Logout'),
-              ),
+                _buildSettingItem(
+                  icon: Icons.lock_outline,
+                  title: 'Change Password',
+                  onTap: () {
+                    // Navigate to change password screen
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.notifications_none,
+                  title: 'Notification Settings',
+                  onTap: () {
+                    // Navigate to notification settings
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Support
+                _buildSectionTitle('Support'),
+                _buildSettingItem(
+                  icon: Icons.help_outline,
+                  title: 'Help Center',
+                  onTap: () {
+                    // Navigate to help center
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.email_outlined,
+                  title: 'Contact Support',
+                  onTap: () {
+                    // Navigate to contact support
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Logout Button
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        // Show confirmation dialog
+                        final shouldLogout = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Logout'),
+                            content: const Text('Are you sure you want to logout?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                child: const Text('Logout'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (shouldLogout == true) {
+                          // Sign out from Supabase (clears session and persistent data)
+                          await Supabase.instance.client.auth.signOut();
+
+                          if (context.mounted) {
+                            // Navigate to login screen
+                            context.go(AppRoutes.login);
+
+                            // Show success message
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Logged out successfully'), backgroundColor: Colors.green),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Error logging out: $e'), backgroundColor: Colors.red));
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade50,
+                      foregroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Logout'),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -326,11 +327,23 @@ class StudentProfileScreen extends ConsumerWidget {
   /// Format a date string for display
   String _formatDate(String? dateString) {
     if (dateString == null) return 'Unknown';
-    
+
     try {
       final date = DateTime.parse(dateString);
-      final months = ['January', 'February', 'March', 'April', 'May', 'June',
-                     'July', 'August', 'September', 'October', 'November', 'December'];
+      final months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
       return '${months[date.month - 1]} ${date.day}, ${date.year}';
     } catch (e) {
       return 'Unknown';
@@ -358,21 +371,10 @@ class StudentProfileScreen extends ConsumerWidget {
         children: [
           const Text('Student Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          if (studentId != null) ...[
-            _buildInfoRow('Student ID', studentId),
-            const SizedBox(height: 8),
-          ],
-          if (gradeLevel != null) ...[
-            _buildInfoRow('Grade Level', 'Grade $gradeLevel'),
-            const SizedBox(height: 8),
-          ],
-          if (board != null) ...[
-            _buildInfoRow('Board', board),
-            const SizedBox(height: 8),
-          ],
-          if (schoolName != null) ...[
-            _buildInfoRow('School', schoolName),
-          ],
+          if (studentId != null) ...[_buildInfoRow('Student ID', studentId), const SizedBox(height: 8)],
+          if (gradeLevel != null) ...[_buildInfoRow('Grade Level', 'Grade $gradeLevel'), const SizedBox(height: 8)],
+          if (board != null) ...[_buildInfoRow('Board', board), const SizedBox(height: 8)],
+          if (schoolName != null) ...[_buildInfoRow('School', schoolName)],
           if (gradeLevel == null && board == null && schoolName == null) ...[
             Text(
               'Complete your profile to see more information here.',
@@ -391,16 +393,10 @@ class StudentProfileScreen extends ConsumerWidget {
       children: [
         SizedBox(
           width: 100,
-          child: Text(
-            '$label:',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
+          child: Text('$label:', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
         ),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
+          child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
         ),
       ],
     );

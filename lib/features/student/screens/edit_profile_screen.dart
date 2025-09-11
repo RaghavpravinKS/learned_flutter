@@ -41,18 +41,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   void _populateFields(Map<String, dynamic> studentProfile) {
     final userInfo = studentProfile['users'] as Map<String, dynamic>;
-    
+
     _firstNameController.text = userInfo['first_name'] ?? '';
     _lastNameController.text = userInfo['last_name'] ?? '';
     _phoneController.text = studentProfile['phone'] ?? '';
     _schoolController.text = studentProfile['school_name'] ?? '';
     _learningGoalsController.text = studentProfile['learning_goals'] ?? '';
-    
+
     final gradeLevel = studentProfile['grade_level'];
     if (gradeLevel != null) {
       _selectedGrade = 'Grade $gradeLevel';
     }
-    
+
     _selectedBoard = studentProfile['board'];
   }
 
@@ -64,43 +64,46 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     try {
       final supabase = Supabase.instance.client;
       final currentUser = supabase.auth.currentUser;
-      
+
       if (currentUser == null) {
         throw Exception('No authenticated user found');
       }
 
       // Update user information
-      await supabase.from('users').update({
-        'first_name': _firstNameController.text.trim(),
-        'last_name': _lastNameController.text.trim(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', currentUser.id);
+      await supabase
+          .from('users')
+          .update({
+            'first_name': _firstNameController.text.trim(),
+            'last_name': _lastNameController.text.trim(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', currentUser.id);
 
       // Update student-specific information
-      final gradeNumber = _selectedGrade != null 
-          ? int.tryParse(_selectedGrade!.replaceAll('Grade ', ''))
-          : null;
+      final gradeNumber = _selectedGrade != null ? int.tryParse(_selectedGrade!.replaceAll('Grade ', '')) : null;
 
-      await supabase.from('students').update({
-        'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        'school_name': _schoolController.text.trim().isEmpty ? null : _schoolController.text.trim(),
-        'learning_goals': _learningGoalsController.text.trim().isEmpty ? null : _learningGoalsController.text.trim(),
-        'grade_level': gradeNumber,
-        'board': _selectedBoard,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('user_id', currentUser.id);
+      await supabase
+          .from('students')
+          .update({
+            'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+            'school_name': _schoolController.text.trim().isEmpty ? null : _schoolController.text.trim(),
+            'learning_goals': _learningGoalsController.text.trim().isEmpty
+                ? null
+                : _learningGoalsController.text.trim(),
+            'grade_level': gradeNumber,
+            'board': _selectedBoard,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('user_id', currentUser.id);
 
       // Invalidate the profile provider to refresh data
       ref.invalidate(currentStudentProfileProvider);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green));
+
         // Navigate back after a short delay
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) {
@@ -108,15 +111,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           }
         });
       }
-
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating profile: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) {
@@ -140,11 +139,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ),
           TextButton(
             onPressed: _isLoading ? null : _saveProfile,
-            child: _isLoading ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ) : const Text('Save'),
+            child: _isLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Save'),
           ),
         ],
       ),
@@ -181,8 +178,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   SizedBox(height: 16),
                   Text('No student profile found', style: TextStyle(fontSize: 16)),
                   SizedBox(height: 8),
-                  Text('Please contact support if this issue persists', 
-                       style: TextStyle(color: Colors.grey)),
+                  Text('Please contact support if this issue persists', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             );
@@ -279,7 +275,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     label: 'Grade Level',
                     value: _selectedGrade,
                     items: _grades,
-                    onChanged: (value) => setState(() => {
+                    onChanged: (value) => setState(() {
                       _selectedGrade = value;
                       _hasChanges = true;
                     }),
@@ -292,7 +288,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     label: 'Board',
                     value: _selectedBoard,
                     items: _boards,
-                    onChanged: (value) => setState(() => {
+                    onChanged: (value) => setState(() {
                       _selectedBoard = value;
                       _hasChanges = true;
                     }),
@@ -341,68 +337,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
     );
   }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              _buildFormField(
-                label: 'Phone Number',
-                controller: _phoneController,
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your phone number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Bio
-              TextFormField(
-                controller: _bioController,
-                maxLines: 4,
-                maxLength: 200,
-                decoration: InputDecoration(
-                  labelText: 'Bio',
-                  hintText: 'Tell us about yourself...',
-                  alignLabelWithHint: true,
-                  prefixIcon: const Icon(Icons.info_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Save Changes', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-
-              // Change Password Button
-              TextButton(
-                onPressed: () {
-                  // Navigate to change password screen
-                },
-                child: const Text('Change Password'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildFormField({
     required String label,
@@ -425,12 +359,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
-      validator: required ? (validator ?? (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter your ${label.toLowerCase()}';
-        }
-        return null;
-      }) : validator,
+      validator: required
+          ? (validator ??
+                (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your ${label.toLowerCase()}';
+                  }
+                  return null;
+                })
+          : validator,
     );
   }
 
@@ -450,10 +387,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       items: items.map((String item) {
-        return DropdownMenuItem<String>(
-          value: item,
-          child: Text(item),
-        );
+        return DropdownMenuItem<String>(value: item, child: Text(item));
       }).toList(),
       onChanged: onChanged,
       validator: (value) {

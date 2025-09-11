@@ -1,6 +1,21 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.admin_activities (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  admin_id uuid,
+  activity_type character varying NOT NULL CHECK (activity_type::text = ANY (ARRAY['create_teacher'::character varying, 'verify_document'::character varying, 'approve_teacher'::character varying, 'reject_teacher'::character varying, 'review_classroom'::character varying, 'handle_refund'::character varying, 'ban_user'::character varying]::text[])),
+  target_user_id uuid,
+  target_table character varying,
+  target_record_id uuid,
+  description text,
+  metadata jsonb,
+  ip_address inet,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT admin_activities_pkey PRIMARY KEY (id),
+  CONSTRAINT admin_activities_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES public.users(id),
+  CONSTRAINT admin_activities_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.assignment_questions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   assignment_id uuid,
@@ -50,8 +65,8 @@ CREATE TABLE public.class_sessions (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT class_sessions_pkey PRIMARY KEY (id),
-  CONSTRAINT class_sessions_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id),
-  CONSTRAINT class_sessions_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
+  CONSTRAINT class_sessions_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
+  CONSTRAINT class_sessions_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
 );
 CREATE TABLE public.classroom_pricing (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -91,9 +106,9 @@ CREATE TABLE public.enrollment_requests (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT enrollment_requests_pkey PRIMARY KEY (id),
-  CONSTRAINT enrollment_requests_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.payments(id),
   CONSTRAINT enrollment_requests_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT enrollment_requests_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
+  CONSTRAINT enrollment_requests_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
+  CONSTRAINT enrollment_requests_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.payments(id)
 );
 CREATE TABLE public.learning_materials (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -111,8 +126,8 @@ CREATE TABLE public.learning_materials (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT learning_materials_pkey PRIMARY KEY (id),
-  CONSTRAINT learning_materials_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id),
-  CONSTRAINT learning_materials_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
+  CONSTRAINT learning_materials_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
+  CONSTRAINT learning_materials_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
 );
 CREATE TABLE public.parent_student_relations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -165,9 +180,9 @@ CREATE TABLE public.payments (
   classroom_id uuid,
   status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'completed'::character varying, 'failed'::character varying, 'refunded'::character varying, 'cancelled'::character varying]::text[])),
   CONSTRAINT payments_pkey PRIMARY KEY (id),
+  CONSTRAINT payments_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
   CONSTRAINT payments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT payments_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.student_subscriptions(id),
-  CONSTRAINT payments_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
+  CONSTRAINT payments_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.student_subscriptions(id)
 );
 CREATE TABLE public.session_attendance (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -199,8 +214,8 @@ CREATE TABLE public.student_assignment_attempts (
   answers jsonb,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT student_assignment_attempts_pkey PRIMARY KEY (id),
-  CONSTRAINT student_assignment_attempts_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT student_assignment_attempts_assignment_id_fkey FOREIGN KEY (assignment_id) REFERENCES public.assignments(id)
+  CONSTRAINT student_assignment_attempts_assignment_id_fkey FOREIGN KEY (assignment_id) REFERENCES public.assignments(id),
+  CONSTRAINT student_assignment_attempts_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
 CREATE TABLE public.student_classroom_assignments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -216,10 +231,10 @@ CREATE TABLE public.student_classroom_assignments (
   enrolled_date timestamp with time zone DEFAULT now(),
   progress numeric DEFAULT 0.0,
   CONSTRAINT student_classroom_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT student_classroom_assignments_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.users(id),
   CONSTRAINT student_classroom_assignments_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id),
-  CONSTRAINT student_classroom_assignments_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
   CONSTRAINT student_classroom_assignments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT student_classroom_assignments_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.users(id)
+  CONSTRAINT student_classroom_assignments_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
 );
 CREATE TABLE public.student_material_access (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -229,8 +244,8 @@ CREATE TABLE public.student_material_access (
   download_count integer DEFAULT 0,
   last_accessed timestamp with time zone DEFAULT now(),
   CONSTRAINT student_material_access_pkey PRIMARY KEY (id),
-  CONSTRAINT student_material_access_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT student_material_access_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.learning_materials(id)
+  CONSTRAINT student_material_access_material_id_fkey FOREIGN KEY (material_id) REFERENCES public.learning_materials(id),
+  CONSTRAINT student_material_access_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
 CREATE TABLE public.student_progress (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -249,8 +264,8 @@ CREATE TABLE public.student_progress (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT student_progress_pkey PRIMARY KEY (id),
-  CONSTRAINT student_progress_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
-  CONSTRAINT student_progress_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+  CONSTRAINT student_progress_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT student_progress_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
 );
 CREATE TABLE public.student_subscriptions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -263,8 +278,8 @@ CREATE TABLE public.student_subscriptions (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT student_subscriptions_pkey PRIMARY KEY (id),
-  CONSTRAINT student_subscriptions_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT student_subscriptions_payment_plan_id_fkey FOREIGN KEY (payment_plan_id) REFERENCES public.payment_plans(id)
+  CONSTRAINT student_subscriptions_payment_plan_id_fkey FOREIGN KEY (payment_plan_id) REFERENCES public.payment_plans(id),
+  CONSTRAINT student_subscriptions_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
 CREATE TABLE public.students (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -306,6 +321,42 @@ CREATE TABLE public.teacher_availability (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT teacher_availability_pkey PRIMARY KEY (id),
   CONSTRAINT teacher_availability_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
+);
+CREATE TABLE public.teacher_documents (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  teacher_id uuid,
+  document_type character varying NOT NULL CHECK (document_type::text = ANY (ARRAY['certificate'::character varying, 'id_proof'::character varying, 'background_check'::character varying, 'resume'::character varying, 'photo'::character varying]::text[])),
+  document_name character varying NOT NULL,
+  file_url text NOT NULL,
+  file_size bigint,
+  mime_type character varying,
+  verification_status character varying DEFAULT 'pending'::character varying CHECK (verification_status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying]::text[])),
+  verified_by uuid,
+  verified_at timestamp with time zone,
+  rejection_reason text,
+  expires_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT teacher_documents_pkey PRIMARY KEY (id),
+  CONSTRAINT teacher_documents_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.users(id),
+  CONSTRAINT teacher_documents_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id)
+);
+CREATE TABLE public.teacher_verification (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  teacher_id uuid UNIQUE,
+  verification_stage character varying DEFAULT 'profile_incomplete'::character varying CHECK (verification_stage::text = ANY (ARRAY['profile_incomplete'::character varying, 'documents_pending'::character varying, 'documents_submitted'::character varying, 'under_review'::character varying, 'approved'::character varying, 'rejected'::character varying]::text[])),
+  profile_completed_at timestamp with time zone,
+  documents_submitted_at timestamp with time zone,
+  reviewed_by uuid,
+  reviewed_at timestamp with time zone,
+  approval_notes text,
+  rejection_reason text,
+  background_check_status character varying CHECK (background_check_status::text = ANY (ARRAY['pending'::character varying, 'clear'::character varying, 'flagged'::character varying]::text[])),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT teacher_verification_pkey PRIMARY KEY (id),
+  CONSTRAINT teacher_verification_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teachers(id),
+  CONSTRAINT teacher_verification_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.teachers (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
