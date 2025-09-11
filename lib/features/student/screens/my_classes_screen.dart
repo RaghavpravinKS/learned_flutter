@@ -262,7 +262,7 @@ class MyClassesScreen extends ConsumerWidget {
                   Icon(Icons.person, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    classroom['teacher_name'] ?? 'Unknown Teacher',
+                    classroom['teacher_name'] ?? 'Teacher Info Unavailable',
                     style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(width: 16),

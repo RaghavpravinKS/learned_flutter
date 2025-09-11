@@ -5,19 +5,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
 import 'package:learned_flutter/routes/app_routes.dart';
 import 'package:learned_flutter/features/debug/helpers/auth_debug_helper.dart';
+import 'package:learned_flutter/features/student/providers/student_profile_provider.dart';
 
 class StudentProfileScreen extends ConsumerWidget {
   const StudentProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Fetch actual student data from provider
-    final studentName = 'John Doe';
-    final email = 'john.doe@example.com';
-    final joinDate = 'January 15, 2024';
-    final totalCourses = 5;
-    final completedCourses = 2;
-    final inProgressCourses = 3;
+    final studentProfileAsync = ref.watch(currentStudentProfileProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,17 +32,72 @@ class StudentProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Profile Header
-            _buildProfileHeader(studentName, email, joinDate),
-            const SizedBox(height: 24),
+      body: studentProfileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              const Text('Failed to load profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(currentStudentProfileProvider),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (studentProfile) {
+          if (studentProfile == null) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.person_off, size: 48, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No student profile found', style: TextStyle(fontSize: 16)),
+                  SizedBox(height: 8),
+                  Text('Please contact support if this issue persists', 
+                       style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
 
-            // Progress Overview
-            _buildProgressOverview(completedCourses, inProgressCourses, totalCourses),
+          // Extract data from the profile
+          final userInfo = studentProfile['users'] as Map<String, dynamic>;
+          final studentName = '${userInfo['first_name']} ${userInfo['last_name']}';
+          final email = userInfo['email'] as String;
+          final joinDate = _formatDate(studentProfile['created_at'] as String?);
+          
+          // TODO: Get actual course statistics from enrollments
+          const totalCourses = 0; // Will be updated when enrollment data is connected
+          const completedCourses = 0;
+          const inProgressCourses = 0;
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profile Header
+                _buildProfileHeader(studentName, email, joinDate),
+                const SizedBox(height: 24),
+
+                // Student-specific Information
+                _buildStudentInfo(studentProfile),
+                const SizedBox(height: 24),
+
+                // Progress Overview
+                _buildProgressOverview(completedCourses, inProgressCourses, totalCourses),
             const SizedBox(height: 24),
 
             // Account Settings
@@ -262,6 +312,89 @@ class StudentProfileScreen extends ConsumerWidget {
       title: Text(title),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap,
+    );
+  }
+
+  /// Format a date string for display
+  String _formatDate(String? dateString) {
+    if (dateString == null) return 'Unknown';
+    
+    try {
+      final date = DateTime.parse(dateString);
+      final months = ['January', 'February', 'March', 'April', 'May', 'June',
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  /// Build student-specific information section
+  Widget _buildStudentInfo(Map<String, dynamic> studentProfile) {
+    final gradeLevel = studentProfile['grade_level'];
+    final schoolName = studentProfile['school_name'];
+    final board = studentProfile['board'];
+    final studentId = studentProfile['student_id'];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 4, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Student Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          if (studentId != null) ...[
+            _buildInfoRow('Student ID', studentId),
+            const SizedBox(height: 8),
+          ],
+          if (gradeLevel != null) ...[
+            _buildInfoRow('Grade Level', 'Grade $gradeLevel'),
+            const SizedBox(height: 8),
+          ],
+          if (board != null) ...[
+            _buildInfoRow('Board', board),
+            const SizedBox(height: 8),
+          ],
+          if (schoolName != null) ...[
+            _buildInfoRow('School', schoolName),
+          ],
+          if (gradeLevel == null && board == null && schoolName == null) ...[
+            Text(
+              'Complete your profile to see more information here.',
+              style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Build an information row
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(
+            '$label:',
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
     );
   }
 }

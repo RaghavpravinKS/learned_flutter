@@ -208,7 +208,7 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
               ],
               const SizedBox(height: 8),
               Text(
-                'Taught by: ${classroom['teacher_name'] ?? 'Unknown Teacher'}',
+                'Taught by: ${classroom['teacher_name'] ?? 'Teacher Info Unavailable'}',
                 style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               if (classroom['description'] != null) ...[
