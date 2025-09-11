@@ -77,11 +77,6 @@ class StudentProfileScreen extends ConsumerWidget {
           final studentName = '${userInfo['first_name']} ${userInfo['last_name']}';
           final email = userInfo['email'] as String;
           final joinDate = _formatDate(studentProfile['created_at'] as String?);
-          
-          // TODO: Get actual course statistics from enrollments
-          const totalCourses = 0; // Will be updated when enrollment data is connected
-          const completedCourses = 0;
-          const inProgressCourses = 0;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -96,8 +91,21 @@ class StudentProfileScreen extends ConsumerWidget {
                 _buildStudentInfo(studentProfile),
                 const SizedBox(height: 24),
 
-                // Progress Overview
-                _buildProgressOverview(completedCourses, inProgressCourses, totalCourses),
+                // Progress Overview with real data
+                Consumer(
+                  builder: (context, ref, child) {
+                    final enrollmentStatsAsync = ref.watch(studentEnrollmentStatsProvider);
+                    return enrollmentStatsAsync.when(
+                      loading: () => _buildProgressOverview(0, 0, 0),
+                      error: (error, stack) => _buildProgressOverview(0, 0, 0),
+                      data: (stats) => _buildProgressOverview(
+                        stats['completed'] ?? 0,
+                        stats['active'] ?? 0,
+                        stats['total'] ?? 0,
+                      ),
+                    );
+                  },
+                ),
             const SizedBox(height: 24),
 
             // Account Settings
