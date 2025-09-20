@@ -4,10 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants/environment.dart';
-import 'core/services/auth_service.dart';
+import 'features/auth/services/auth_service.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
-import 'routes/app_routes.dart';
 
 // Provider for Supabase client
 final supabaseProvider = Provider<SupabaseClient>((ref) {
@@ -16,14 +15,12 @@ final supabaseProvider = Provider<SupabaseClient>((ref) {
 
 // Provider for AuthService
 final authServiceProvider = Provider<AuthService>((ref) {
-  final supabaseClient = ref.watch(supabaseProvider);
-  return AuthService(supabaseClient);
+  return AuthService();
 });
 
 // Auth state provider
 final authStateProvider = StreamProvider<User?>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return authService.onAuthStateChange.map((event) {
+  return Supabase.instance.client.auth.onAuthStateChange.map((event) {
     return event.session?.user;
   });
 });
@@ -31,31 +28,27 @@ final authStateProvider = StreamProvider<User?>((ref) {
 void main() async {
   // Debug print environment variables
   print('Supabase URL from env: ${Environment.supabaseUrl}');
-  print('Supabase Anon Key from env: ${Environment.supabaseAnonKey.isNotEmpty ? '***${Environment.supabaseAnonKey.substring(Environment.supabaseAnonKey.length - 4)}' : 'NOT SET'}');
-  
+  print(
+    'Supabase Anon Key from env: ${Environment.supabaseAnonKey.isNotEmpty ? '***${Environment.supabaseAnonKey.substring(Environment.supabaseAnonKey.length - 4)}' : 'NOT SET'}',
+  );
+
   // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Google Fonts
   GoogleFonts.config.allowRuntimeFetching = true;
-  
+
   // Initialize Supabase
   try {
     await Supabase.initialize(
       url: Environment.supabaseUrl,
       anonKey: Environment.supabaseAnonKey,
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-      ),
+      authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
     );
-    
+
     print('Supabase initialized successfully');
-    
-    runApp(
-      const ProviderScope(
-        child: LearnEDApp(),
-      ),
-    );
+
+    runApp(const ProviderScope(child: LearnEDApp()));
   } catch (e) {
     print('Error initializing Supabase: $e');
     rethrow;
@@ -69,7 +62,7 @@ class LearnEDApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch auth state to trigger rebuilds on auth changes
     ref.watch(authStateProvider);
-    
+
     return MaterialApp.router(
       title: Environment.appName,
       debugShowCheckedModeBanner: false,

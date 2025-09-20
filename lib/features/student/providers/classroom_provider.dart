@@ -8,15 +8,20 @@ final classroomServiceProvider = Provider<ClassroomService>((ref) {
 
 // Simple provider that fetches all classrooms once
 final allClassroomsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  print('🔍 Fetching all classrooms...');
   final service = ref.watch(classroomServiceProvider);
   return service.getAvailableClassrooms();
+});
+
+// Check if student is enrolled in a specific classroom
+final studentEnrollmentStatusProvider = FutureProvider.autoDispose.family<bool, String>((ref, classroomId) async {
+  final service = ref.watch(classroomServiceProvider);
+  final enrolledClassrooms = await service.getEnrolledClassrooms(null);
+  return enrolledClassrooms.any((classroom) => classroom['id'] == classroomId);
 });
 
 // Legacy provider kept for compatibility with other parts of the app
 final availableClassroomsProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, Map<String, dynamic>?>((ref, filters) async {
-      print('🔍 Legacy provider called with filters: $filters');
       final service = ref.watch(classroomServiceProvider);
       return service.getAvailableClassrooms(
         subject: filters?['subject'],

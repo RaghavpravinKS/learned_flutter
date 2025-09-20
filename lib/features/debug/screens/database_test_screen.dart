@@ -59,11 +59,11 @@ class _DatabaseTestScreenState extends ConsumerState<DatabaseTestScreen> {
     resultLog.writeln('2. Verified user in `users` table with email: ${userRecord['email']}');
 
     // 3. Create a corresponding student record
-    final studentRecord = await supabase.from('students').insert({
-      'user_id': createdUser.id,
-      'student_id': 'stud_${DateTime.now().millisecondsSinceEpoch}',
-      'learning_goals': 'Test goals'
-    }).select().single();
+    final studentRecord = await supabase
+        .from('students')
+        .insert({'user_id': createdUser.id, 'student_id': 'stud_${DateTime.now().millisecondsSinceEpoch}'})
+        .select()
+        .single();
     resultLog.writeln('3. Created student record with ID: ${studentRecord['id']}');
 
     return resultLog.toString();
@@ -87,33 +87,45 @@ class _DatabaseTestScreenState extends ConsumerState<DatabaseTestScreen> {
     teacherUserId = teacherRes['user_id'] as String?;
     if (teacherId == null || teacherUserId == null) throw Exception('Failed to create test teacher.');
     resultLog.writeln('2. Created test teacher: $teacherId (user: $teacherUserId)');
-    
+
     // 2. Create classroom
-    final classroomRes = await supabase.from('classrooms').insert({
-      'teacher_id': teacherId, // teacherId is non-null here
-      'name': 'Test Classroom',
-      'subject': 'Math',
-      'grade_level': 5
-    }).select().single();
+    final classroomRes = await supabase
+        .from('classrooms')
+        .insert({
+          'teacher_id': teacherId, // teacherId is non-null here
+          'name': 'Test Classroom',
+          'subject': 'Math',
+          'grade_level': 5,
+        })
+        .select()
+        .single();
     classroomId = classroomRes['id'] as String?;
     if (classroomId == null) throw Exception('Failed to create classroom.');
     resultLog.writeln('3. Created test classroom: $classroomId');
 
     // 3. Simulate payment
-    final paymentRes = await supabase.from('payments').insert({
-      'student_id': studentId, // studentId is non-null here
-      'amount': 100.00,
-      'payment_status': 'completed',
-      'description': 'Test payment for enrollment'
-    }).select().single();
+    final paymentRes = await supabase
+        .from('payments')
+        .insert({
+          'student_id': studentId, // studentId is non-null here
+          'amount': 100.00,
+          'payment_status': 'completed',
+          'description': 'Test payment for enrollment',
+        })
+        .select()
+        .single();
     resultLog.writeln('4. Simulated payment: ${paymentRes['id']}');
 
     // 4. Assign student to classroom
-    final assignmentRes = await supabase.from('student_classroom_assignments').insert({
-      'student_id': studentId, // studentId is non-null here
-      'classroom_id': classroomId, // classroomId is non-null here
-      'teacher_id': teacherId // teacherId is non-null here
-    }).select().single();
+    final assignmentRes = await supabase
+        .from('student_classroom_assignments')
+        .insert({
+          'student_id': studentId, // studentId is non-null here
+          'classroom_id': classroomId, // classroomId is non-null here
+          'teacher_id': teacherId, // teacherId is non-null here
+        })
+        .select()
+        .single();
     resultLog.writeln('5. Assigned student to classroom: ${assignmentRes['id']}');
 
     // 5. Verify enrollment
@@ -133,9 +145,7 @@ class _DatabaseTestScreenState extends ConsumerState<DatabaseTestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Backend Flow Tests'),
-      ),
+      appBar: AppBar(title: const Text('Backend Flow Tests')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -151,15 +161,11 @@ class _DatabaseTestScreenState extends ConsumerState<DatabaseTestScreen> {
               child: const Text('2. Verify Payment & Enrollment'),
             ),
             const SizedBox(height: 20),
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator()),
+            if (_isLoading) const Center(child: CircularProgressIndicator()),
             if (!_isLoading && _result.isNotEmpty)
               Expanded(
                 child: SingleChildScrollView(
-                  child: Text(
-                    _result,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                  ),
+                  child: Text(_result, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
                 ),
               ),
           ],

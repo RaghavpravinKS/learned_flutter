@@ -3,26 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
 import 'package:learned_flutter/features/student/services/classroom_service.dart';
-import 'package:learned_flutter/features/debug/helpers/auth_debug_helper.dart';
 
 // Provider for enrolled classrooms
 final enrolledClassroomsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  print('🔍 MyClassesScreen: enrolledClassroomsProvider called');
   final classroomService = ClassroomService();
-
-  // Let the classroom service determine the student ID from authentication
-  // Pass null to trigger authenticated user detection
-  print('🔍 MyClassesScreen: Fetching classrooms using authenticated user');
-
   final classrooms = await classroomService.getEnrolledClassrooms(null);
-  print('🔍 MyClassesScreen: Provider received ${classrooms.length} classrooms');
-
-  // Print detailed info about each classroom
-  for (int i = 0; i < classrooms.length; i++) {
-    final classroom = classrooms[i];
-    print('🔍 MyClassesScreen: Classroom $i: ${classroom['name']} - Teacher: ${classroom['teacher_name']}');
-  }
-
   return classrooms;
 });
 
@@ -37,7 +22,6 @@ class MyClassesScreen extends ConsumerWidget {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            print('🔄 MyClassesScreen: Pull-to-refresh triggered');
             ref.invalidate(enrolledClassroomsProvider);
           },
           child: enrolledClassrooms.when(
@@ -58,7 +42,6 @@ class MyClassesScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      print('🔄 MyClassesScreen: Retry button pressed');
                       ref.invalidate(enrolledClassroomsProvider);
                     },
                     child: const Text('Retry'),
@@ -67,37 +50,14 @@ class MyClassesScreen extends ConsumerWidget {
               ),
             ),
             data: (classrooms) {
-              print('🔍 MyClassesScreen: UI rendering with ${classrooms.length} classrooms');
               if (classrooms.isEmpty) {
-                print('🔍 MyClassesScreen: No classrooms found, showing empty state');
                 return _buildEmptyState(context);
               }
-              print('🔍 MyClassesScreen: Building classroom list UI');
               return CustomScrollView(slivers: _buildClassroomList(context, classrooms));
             },
           ),
         ), // Close SafeArea
       ), // Close RefreshIndicator
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () => _debugEnrollmentData(context, ref),
-            mini: true,
-            heroTag: "debug_enrollment",
-            backgroundColor: Colors.orange.withOpacity(0.7),
-            child: const Icon(Icons.storage, size: 16),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton(
-            onPressed: () => AuthDebugHelper.showAuthDebugDialog(context),
-            mini: true,
-            heroTag: "debug_auth",
-            backgroundColor: Colors.blue.withOpacity(0.7),
-            child: const Icon(Icons.bug_report, size: 16),
-          ),
-        ],
-      ),
     );
   }
 
@@ -138,7 +98,6 @@ class MyClassesScreen extends ConsumerWidget {
                       const SizedBox(width: 16),
                       OutlinedButton.icon(
                         onPressed: () {
-                          print('🔄 MyClassesScreen: Refresh from empty state');
                           ref.invalidate(enrolledClassroomsProvider);
                         },
                         icon: const Icon(Icons.refresh),
@@ -156,8 +115,6 @@ class MyClassesScreen extends ConsumerWidget {
   }
 
   List<Widget> _buildClassroomList(BuildContext context, List<Map<String, dynamic>> classrooms) {
-    print('🔍 MyClassesScreen: _buildClassroomList called with ${classrooms.length} classrooms');
-
     return [
       SliverToBoxAdapter(
         child: Padding(
@@ -186,9 +143,6 @@ class MyClassesScreen extends ConsumerWidget {
       SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
           final classroom = classrooms[index];
-          print(
-            '🔍 MyClassesScreen: Building card for classroom $index: ${classroom['name']} with teacher: ${classroom['teacher_name']}',
-          );
           return _buildClassroomCard(context, classroom);
         }, childCount: classrooms.length),
       ),
@@ -205,8 +159,8 @@ class MyClassesScreen extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: InkWell(
         onTap: () {
-          // Navigate to classroom details
-          context.push('/classrooms/${classroom['id']}');
+          // Navigate to classroom home for enrolled students
+          context.push('/classroom-home/${classroom['id']}');
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -372,50 +326,6 @@ class MyClassesScreen extends ConsumerWidget {
       return 'Tomorrow at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
     } else {
       return '${dateTime.day}/${dateTime.month} at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
-  }
-
-  void _debugEnrollmentData(BuildContext context, WidgetRef ref) async {
-    try {
-      print('🔍 Debug: Checking enrollment data...');
-      final classroomService = ClassroomService();
-
-      // Test direct enrollment query
-      final enrollments = await classroomService.getEnrolledClassrooms(null);
-      print('🔍 Debug: Found ${enrollments.length} enrollments');
-
-      // Show debug dialog
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Enrollment Debug'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Enrolled Classrooms: ${enrollments.length}'),
-                const SizedBox(height: 8),
-                if (enrollments.isEmpty)
-                  const Text('No enrollments found in database')
-                else
-                  ...enrollments.map((e) => Text('• ${e['name']}')),
-                const SizedBox(height: 16),
-                const Text(
-                  'Check console logs for detailed debugging info.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close'))],
-          ),
-        );
-      }
-    } catch (e) {
-      print('🔍 Debug enrollment error: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Debug error: $e')));
-      }
     }
   }
 }

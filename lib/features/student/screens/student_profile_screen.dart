@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
 import 'package:learned_flutter/routes/app_routes.dart';
-import 'package:learned_flutter/features/debug/helpers/auth_debug_helper.dart';
 import 'package:learned_flutter/features/student/providers/student_profile_provider.dart';
 
 class StudentProfileScreen extends ConsumerWidget {
@@ -15,23 +14,6 @@ class StudentProfileScreen extends ConsumerWidget {
     final studentProfileAsync = ref.watch(currentStudentProfileProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () => AuthDebugHelper.showAuthDebugDialog(context),
-            tooltip: 'Debug Authentication',
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // Navigate to edit profile screen
-              context.push(AppRoutes.studentProfileEdit);
-            },
-          ),
-        ],
-      ),
       body: studentProfileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
@@ -77,133 +59,153 @@ class StudentProfileScreen extends ConsumerWidget {
           final email = userInfo['email'] as String;
           final joinDate = _formatDate(studentProfile['created_at'] as String?);
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile Header
-                _buildProfileHeader(studentName, email, joinDate),
-                const SizedBox(height: 24),
+          return SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Page Title
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                    child: Text(
+                      'My Profile',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
+                    ),
+                  ),
 
-                // Student-specific Information
-                _buildStudentInfo(studentProfile),
-                const SizedBox(height: 24),
+                  // Profile Header
+                  _buildProfileHeader(studentName, email, joinDate),
+                  const SizedBox(height: 24),
 
-                // Progress Overview with real data
-                Consumer(
-                  builder: (context, ref, child) {
-                    final enrollmentStatsAsync = ref.watch(studentEnrollmentStatsProvider);
-                    return enrollmentStatsAsync.when(
-                      loading: () => _buildProgressOverview(0, 0, 0),
-                      error: (error, stack) => _buildProgressOverview(0, 0, 0),
-                      data: (stats) =>
-                          _buildProgressOverview(stats['completed'] ?? 0, stats['active'] ?? 0, stats['total'] ?? 0),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
+                  // Student-specific Information
+                  _buildStudentInfo(studentProfile),
+                  const SizedBox(height: 24),
 
-                // Account Settings
-                _buildSectionTitle('Account Settings'),
-                _buildSettingItem(
-                  icon: Icons.person_outline,
-                  title: 'Personal Information',
-                  onTap: () {
-                    // Navigate to personal info screen
-                  },
-                ),
-                _buildSettingItem(
-                  icon: Icons.lock_outline,
-                  title: 'Change Password',
-                  onTap: () {
-                    // Navigate to change password screen
-                  },
-                ),
-                _buildSettingItem(
-                  icon: Icons.notifications_none,
-                  title: 'Notification Settings',
-                  onTap: () {
-                    // Navigate to notification settings
-                  },
-                ),
-                const SizedBox(height: 16),
+                  // Progress Overview with real data
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final enrollmentStatsAsync = ref.watch(studentEnrollmentStatsProvider);
+                      return enrollmentStatsAsync.when(
+                        loading: () => _buildProgressOverview(0, 0, 0),
+                        error: (error, stack) => _buildProgressOverview(0, 0, 0),
+                        data: (stats) =>
+                            _buildProgressOverview(stats['completed'] ?? 0, stats['active'] ?? 0, stats['total'] ?? 0),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
 
-                // Support
-                _buildSectionTitle('Support'),
-                _buildSettingItem(
-                  icon: Icons.help_outline,
-                  title: 'Help Center',
-                  onTap: () {
-                    // Navigate to help center
-                  },
-                ),
-                _buildSettingItem(
-                  icon: Icons.email_outlined,
-                  title: 'Contact Support',
-                  onTap: () {
-                    // Navigate to contact support
-                  },
-                ),
-                const SizedBox(height: 24),
+                  // Account Settings
+                  _buildSectionTitle('Account Settings'),
+                  _buildSettingItem(
+                    icon: Icons.edit_outlined,
+                    title: 'Edit Profile',
+                    onTap: () {
+                      context.push(AppRoutes.studentProfileEdit);
+                    },
+                  ),
+                  _buildSettingItem(
+                    icon: Icons.person_outline,
+                    title: 'Personal Information',
+                    onTap: () {
+                      // Navigate to personal info screen
+                    },
+                  ),
+                  _buildSettingItem(
+                    icon: Icons.lock_outline,
+                    title: 'Change Password',
+                    onTap: () {
+                      // Navigate to change password screen
+                    },
+                  ),
+                  _buildSettingItem(
+                    icon: Icons.notifications_none,
+                    title: 'Notification Settings',
+                    onTap: () {
+                      // Navigate to notification settings
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-                // Logout Button
-                Center(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      try {
-                        // Show confirmation dialog
-                        final shouldLogout = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Logout'),
-                            content: const Text('Are you sure you want to logout?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(true),
-                                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                child: const Text('Logout'),
-                              ),
-                            ],
-                          ),
-                        );
+                  // Support
+                  _buildSectionTitle('Support'),
+                  _buildSettingItem(
+                    icon: Icons.help_outline,
+                    title: 'Help Center',
+                    onTap: () {
+                      // Navigate to help center
+                    },
+                  ),
+                  _buildSettingItem(
+                    icon: Icons.email_outlined,
+                    title: 'Contact Support',
+                    onTap: () {
+                      // Navigate to contact support
+                    },
+                  ),
+                  const SizedBox(height: 24),
 
-                        if (shouldLogout == true) {
-                          // Sign out from Supabase (clears session and persistent data)
-                          await Supabase.instance.client.auth.signOut();
+                  // Logout Button
+                  Center(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          // Show confirmation dialog
+                          final shouldLogout = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Logout'),
+                              content: const Text('Are you sure you want to logout?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                  child: const Text('Logout'),
+                                ),
+                              ],
+                            ),
+                          );
 
+                          if (shouldLogout == true) {
+                            // Sign out from Supabase (clears session and persistent data)
+                            await Supabase.instance.client.auth.signOut();
+
+                            if (context.mounted) {
+                              // Navigate to login screen
+                              context.go(AppRoutes.login);
+
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Logged out successfully'), backgroundColor: Colors.green),
+                              );
+                            }
+                          }
+                        } catch (e) {
                           if (context.mounted) {
-                            // Navigate to login screen
-                            context.go(AppRoutes.login);
-
-                            // Show success message
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Logged out successfully'), backgroundColor: Colors.green),
+                              SnackBar(content: Text('Error logging out: $e'), backgroundColor: Colors.red),
                             );
                           }
                         }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text('Error logging out: $e'), backgroundColor: Colors.red));
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade50,
-                      foregroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade50,
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: const Text('Logout'),
                     ),
-                    icon: const Icon(Icons.logout, size: 18),
-                    label: const Text('Logout'),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

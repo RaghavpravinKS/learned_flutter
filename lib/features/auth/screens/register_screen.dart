@@ -102,6 +102,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     _showErrorSnackBar(errorMessage);
+    print(error);
   }
 
   Future<void> _register() async {

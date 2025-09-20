@@ -12,7 +12,6 @@ import '../widgets/course_progress_section.dart';
 import 'assignments_screen.dart';
 import 'my_classes_screen.dart';
 import 'student_profile_screen.dart';
-import '../../debug/helpers/auth_debug_helper.dart';
 
 class _PageItem {
   final Widget screen;
@@ -482,15 +481,6 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
             onTap: () {
               Navigator.pop(context);
               context.go(AppRoutes.studentSettings);
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.bug_report,
-            title: 'Debug Authentication',
-            onTap: () {
-              Navigator.pop(context);
-              AuthDebugHelper.showAuthDebugDialog(context);
             },
           ),
           _buildDrawerItem(

@@ -24,6 +24,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   bool _isProcessing = false;
   String? _selectedPaymentMethod = 'card';
+  int _selectedPlanIndex = 0; // Track selected payment plan
 
   @override
   void dispose() {
@@ -37,10 +38,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final pricingList = widget.classroom['classroom_pricing'] as List?;
-    final pricingInfo = pricingList?.firstOrNull as Map<String, dynamic>?;
-    final price = pricingInfo?['price'] ?? 0.0;
-    final paymentPlan = pricingInfo?['payment_plans'] as Map<String, dynamic>?;
+    final pricingList = widget.classroom['classroom_pricing'] as List? ?? [];
+
+    // Debug: Print pricing list info
+    print('🔍 PaymentScreen: Building with ${pricingList.length} pricing options');
+    print('🔍 PaymentScreen: Selected plan index: $_selectedPlanIndex');
+    for (int i = 0; i < pricingList.length; i++) {
+      final pricing = pricingList[i];
+      final plan = pricing['payment_plans'] as Map<String, dynamic>?;
+      print('🔍 Plan $i: ${plan?['name']} - \$${pricing['price']}');
+    }
+
+    // Get selected pricing info
+    final selectedPricing = pricingList.isNotEmpty ? pricingList[_selectedPlanIndex] : null;
+    final price = selectedPricing?['price'] ?? 0.0;
+    final paymentPlan = selectedPricing?['payment_plans'] as Map<String, dynamic>?;
     final billingCycle = paymentPlan?['billing_cycle'] ?? 'month';
 
     return Scaffold(
@@ -147,6 +159,102 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
 
               const SizedBox(height: 24),
+
+              // Payment Plan Selection
+              if (pricingList.isNotEmpty) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pricingList.length > 1 ? 'Select Plan' : 'Plan Details',
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        ...pricingList.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final pricingInfo = entry.value;
+                          final planPrice = pricingInfo['price'] ?? 0.0;
+                          final plan = pricingInfo['payment_plans'] as Map<String, dynamic>?;
+                          final cycle = plan?['billing_cycle'] ?? 'month';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: pricingList.length > 1
+                                ? RadioListTile<int>(
+                                    value: index,
+                                    groupValue: _selectedPlanIndex,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedPlanIndex = value ?? 0;
+                                      });
+                                      print('🔍 Payment plan selected: index $_selectedPlanIndex');
+                                      final selectedPlan = pricingList[_selectedPlanIndex];
+                                      final planData = selectedPlan['payment_plans'] as Map<String, dynamic>?;
+                                      print('🔍 Selected plan: ${planData?['name']} - \$${selectedPlan['price']}');
+                                    },
+                                    title: Text(plan?['name'] ?? 'Plan ${index + 1}'),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Every $cycle'),
+                                        if (plan?['features'] != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            List<String>.from(plan!['features']).take(2).join(' • '),
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    secondary: Text(
+                                      '\$${planPrice.toStringAsFixed(2)}',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  )
+                                : ListTile(
+                                    leading: Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                                    title: Text(plan?['name'] ?? 'Plan ${index + 1}'),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Every $cycle'),
+                                        if (plan?['features'] != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            List<String>.from(plan!['features']).take(2).join(' • '),
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    trailing: Text(
+                                      '\$${planPrice.toStringAsFixed(2)}',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
 
               // Payment Method Selection
               Card(
@@ -387,12 +495,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
       print('🔍 _processPayment: Payment simulated successfully');
 
-      // Get pricing info
+      // Get pricing info based on selected plan
       final pricingList = widget.classroom['classroom_pricing'] as List?;
-      final pricingInfo = pricingList?.firstOrNull as Map<String, dynamic>?;
+      final pricingInfo = pricingList != null && pricingList.isNotEmpty
+          ? pricingList[_selectedPlanIndex] as Map<String, dynamic>?
+          : null;
       final price = pricingInfo?['price'] ?? 0.0;
       final paymentPlan = pricingInfo?['payment_plans'] as Map<String, dynamic>?;
 
+      print('🔍 _processPayment: Selected plan index: $_selectedPlanIndex');
       print('🔍 _processPayment: Price: $price, Payment plan: ${paymentPlan?['name']}');
 
       // Enroll student (mock student ID for now)
@@ -440,7 +551,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ref.invalidate(enrolledClassroomsProvider);
                   ref.invalidate(studentEnrollmentStatsProvider);
                   ref.invalidate(currentStudentProfileProvider);
-                  
+
                   context.pop(); // Close dialog
                   context.go('/student/sessions'); // Navigate to My Classes
                 },

@@ -11,6 +11,7 @@ import 'package:learned_flutter/features/splash/screens/splash_screen.dart';
 import 'package:learned_flutter/features/student/screens/student_dashboard_screen.dart';
 import 'package:learned_flutter/features/student/screens/classroom_list_screen.dart';
 import 'package:learned_flutter/features/student/screens/classroom_detail_screen.dart';
+import 'package:learned_flutter/features/student/screens/classroom_home_screen.dart';
 import 'package:learned_flutter/features/student/screens/student_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/edit_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/my_classes_screen.dart';
@@ -48,6 +49,22 @@ final router = GoRouter(
           ),
         ),
       ],
+    ),
+    // Standalone classroom detail route (for enrollment)
+    GoRoute(
+      path: '/classroom-details/:classroomId',
+      pageBuilder: (context, state) => MaterialPage(
+        key: state.pageKey,
+        child: ClassroomDetailScreen(classroomId: state.pathParameters['classroomId']!),
+      ),
+    ),
+    // Classroom home route (for enrolled students)
+    GoRoute(
+      path: '/classroom-home/:classroomId',
+      pageBuilder: (context, state) => MaterialPage(
+        key: state.pageKey,
+        child: ClassroomHomeScreen(classroomId: state.pathParameters['classroomId']!),
+      ),
     ),
     GoRoute(
       path: '/splash',

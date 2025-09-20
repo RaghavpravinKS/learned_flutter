@@ -10,31 +10,29 @@ class ClassroomService {
     try {
       // Try to get teacher info from the nested teachers relationship
       final teacher = classroom['teachers'] as Map<String, dynamic>?;
-      
+
       if (teacher != null) {
         // Try to get user data from teacher
         final teacherUser = teacher['users'] as Map<String, dynamic>?;
-        
+
         if (teacherUser != null) {
           final firstName = teacherUser['first_name'] as String?;
           final lastName = teacherUser['last_name'] as String?;
-          
+
           if (firstName != null && firstName.isNotEmpty) {
-            final fullName = lastName != null && lastName.isNotEmpty 
-                ? '$firstName $lastName' 
-                : firstName;
+            final fullName = lastName != null && lastName.isNotEmpty ? '$firstName $lastName' : firstName;
             print('🔍 _resolveTeacherName: Found teacher name: $fullName');
             return fullName;
           }
         }
-        
+
         // Fallback to teacher_id if available
         final teacherId = teacher['teacher_id'] as String?;
         if (teacherId != null && teacherId.isNotEmpty) {
           print('🔍 _resolveTeacherName: Using teacher_id fallback: $teacherId');
           return 'Teacher $teacherId';
         }
-        
+
         // Fallback to teacher id
         final id = teacher['id'] as String?;
         if (id != null) {
@@ -42,17 +40,16 @@ class ClassroomService {
           return 'Teacher ${id.substring(0, 8)}...';
         }
       }
-      
+
       // Try to get teacher info directly from classroom if no nested relationship
       final teacherId = classroom['teacher_id'] as String?;
       if (teacherId != null && teacherId.isNotEmpty) {
         print('🔍 _resolveTeacherName: Using classroom teacher_id: $teacherId');
         return 'Teacher ${teacherId.substring(0, 8)}...';
       }
-      
+
       print('🔍 _resolveTeacherName: No teacher info found, using default');
       return 'Teacher Info Unavailable';
-      
     } catch (e) {
       print('🔍 _resolveTeacherName: Error resolving teacher name: $e');
       return 'Teacher Info Unavailable';
@@ -64,7 +61,7 @@ class ClassroomService {
     if (teacherId == null || teacherId.isEmpty) {
       return 'Teacher Info Unavailable';
     }
-    
+
     try {
       // Query teacher and user data separately
       final teacherResponse = await _supabase
@@ -77,29 +74,27 @@ class ClassroomService {
           ''')
           .eq('id', teacherId)
           .maybeSingle();
-      
+
       if (teacherResponse != null) {
         final teacherUser = teacherResponse['users'] as Map<String, dynamic>?;
         if (teacherUser != null) {
           final firstName = teacherUser['first_name'] as String?;
           final lastName = teacherUser['last_name'] as String?;
-          
+
           if (firstName != null && firstName.isNotEmpty) {
-            final fullName = lastName != null && lastName.isNotEmpty 
-                ? '$firstName $lastName' 
-                : firstName;
+            final fullName = lastName != null && lastName.isNotEmpty ? '$firstName $lastName' : firstName;
             print('🔍 _getTeacherNameDirectly: Found teacher name: $fullName');
             return fullName;
           }
         }
-        
+
         // Use teacher_id as fallback
         final tId = teacherResponse['teacher_id'] as String?;
         if (tId != null && tId.isNotEmpty) {
           return 'Teacher $tId';
         }
       }
-      
+
       return 'Teacher ${teacherId.substring(0, 8)}...';
     } catch (e) {
       print('🔍 _getTeacherNameDirectly: Error: $e');
@@ -128,7 +123,8 @@ class ClassroomService {
             ),
             classroom_pricing(
               price,
-              payment_plans(name, billing_cycle)
+              payment_plan_id,
+              payment_plans(id, name, billing_cycle, description, features)
             )
           ''')
           .eq('is_active', true);
@@ -157,7 +153,7 @@ class ClassroomService {
         // Get student count for this classroom
         try {
           final studentCountResponse = await _supabase
-              .from('student_classroom_assignments')
+              .from('student_enrollments')
               .select('id')
               .eq('classroom_id', classroom['id'])
               .eq('status', 'active');
@@ -170,7 +166,7 @@ class ClassroomService {
 
         // Format teacher name with improved fallback logic
         String teacherName = _resolveTeacherName(classroom);
-        
+
         // If we couldn't resolve the teacher name from the relationship, try direct query
         if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
           final teacherId = classroom['teacher_id'] as String?;
@@ -178,7 +174,7 @@ class ClassroomService {
             teacherName = await _getTeacherNameDirectly(teacherId);
           }
         }
-        
+
         classroom['teacher_name'] = teacherName;
       }
 
@@ -241,7 +237,8 @@ class ClassroomService {
             .from('classroom_pricing')
             .select('''
               price,
-              payment_plans(name, description, billing_cycle, features)
+              payment_plan_id,
+              payment_plans(id, name, description, billing_cycle, features)
             ''')
             .eq('classroom_id', classroomId);
         pricingData = List<Map<String, dynamic>>.from(pricingResponse);
@@ -253,7 +250,7 @@ class ClassroomService {
       // Get student count
       print('🔍 getClassroomById: Fetching student count...');
       final studentCountResponse = await _supabase
-          .from('student_classroom_assignments')
+          .from('student_enrollments')
           .select('id')
           .eq('classroom_id', classroomId)
           .eq('status', 'active');
@@ -266,7 +263,7 @@ class ClassroomService {
 
       // Format teacher name using the helper method
       String teacherName = _resolveTeacherName(response);
-      
+
       // If we couldn't resolve the teacher name from the relationship, try direct query
       if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
         final teacherId = response['teacher_id'] as String?;
@@ -274,7 +271,7 @@ class ClassroomService {
           teacherName = await _getTeacherNameDirectly(teacherId);
         }
       }
-      
+
       response['teacher_name'] = teacherName;
 
       print('🔍 getClassroomById: Returning processed classroom data with ${response.keys.length} keys');
@@ -340,10 +337,12 @@ class ClassroomService {
 
         print('🔍 enrollStudent: Function completed successfully: $result');
         print('🔍 enrollStudent: 🎉 ENROLLMENT COMPLETED SUCCESSFULLY via DB function! 🎉');
+        print('🔍 enrollStudent: RESULT DETAILS: $result');
 
         return {'success': true, 'message': 'Student enrolled successfully using database function'};
       } catch (dbError) {
-        print('🔍 enrollStudent: Database function failed: $dbError');
+        print('🔍 enrollStudent: ❌ Database function failed: $dbError');
+        print('🔍 enrollStudent: ERROR TYPE: ${dbError.runtimeType}');
         print('🔍 enrollStudent: Falling back to direct database operations...');
       }
 
@@ -356,11 +355,13 @@ class ClassroomService {
 
       // Try to create basic enrollment record with proper UUID
       try {
-        await _supabase.from('student_classroom_assignments').insert({
+        await _supabase.from('student_enrollments').insert({
           'student_id': actualStudentId,
           'classroom_id': classroomId,
+          'payment_plan_id': 'monthly_basic', // Default payment plan for fallback
           'status': 'active',
-          'enrolled_date': DateTime.now().toIso8601String(),
+          'enrollment_date': DateTime.now().toIso8601String(),
+          'start_date': DateTime.now().toIso8601String(),
           'created_at': DateTime.now().toIso8601String(),
         });
         print('🔍 enrollStudent: ✓ Fallback enrollment record created');
@@ -418,7 +419,7 @@ class ClassroomService {
         // Direct SQL query to get enrolled classrooms with all related data
         print('🔍 getEnrolledClassrooms: Querying enrolled classrooms directly...');
         final assignments = await _supabase
-            .from('student_classroom_assignments')
+            .from('student_enrollments')
             .select('''
               *,
               classrooms(
@@ -427,7 +428,6 @@ class ClassroomService {
                 subject,
                 grade_level,
                 description,
-                next_session_date,
                 teacher_id,
                 teachers(
                   id,
@@ -469,7 +469,7 @@ class ClassroomService {
             if (classroom != null) {
               // Build teacher name using helper method
               String teacherName = _resolveTeacherName(classroom);
-              
+
               // If we couldn't resolve the teacher name from the relationship, try direct query
               if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
                 final teacherId = classroom['teacher_id'] as String?;
@@ -504,7 +504,7 @@ class ClassroomService {
       // Fallback: Try legacy query method
       try {
         final assignments = await _supabase
-            .from('student_classroom_assignments')
+            .from('student_enrollments')
             .select('''
               *,
               classrooms(
@@ -534,7 +534,7 @@ class ClassroomService {
           if (classroom != null) {
             // Use helper method for teacher name resolution
             String teacherName = _resolveTeacherName(classroom);
-            
+
             // If we couldn't resolve the teacher name from the relationship, try direct query
             if (teacherName == 'Teacher Info Unavailable' || teacherName.startsWith('Teacher ')) {
               final teacherId = classroom['teacher_id'] as String?;
@@ -542,7 +542,7 @@ class ClassroomService {
                 teacherName = await _getTeacherNameDirectly(teacherId);
               }
             }
-            
+
             enrolledClassrooms.add({
               'id': classroom['id'],
               'name': classroom['name'],

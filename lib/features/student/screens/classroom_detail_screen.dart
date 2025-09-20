@@ -8,10 +8,21 @@ class ClassroomDetailScreen extends ConsumerWidget {
 
   const ClassroomDetailScreen({super.key, required this.classroomId});
 
+  // Helper method to get the lowest price from pricing list
+  double _getLowestPrice(List pricingList) {
+    if (pricingList.isEmpty) return 0.0;
+
+    return pricingList
+        .map<double>((pricing) {
+          return (pricing['price'] ?? 0.0).toDouble();
+        })
+        .reduce((a, b) => a < b ? a : b);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    print('🔍 ClassroomDetailScreen: Building with classroomId: $classroomId');
     final classroomAsync = ref.watch(classroomDetailsProvider(classroomId));
+    final enrollmentStatusAsync = ref.watch(studentEnrollmentStatusProvider(classroomId));
 
     return Scaffold(
       appBar: AppBar(
@@ -19,69 +30,40 @@ class ClassroomDetailScreen extends ConsumerWidget {
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
       ),
       body: classroomAsync.when(
-        loading: () {
-          print('🔍 ClassroomDetailScreen: Loading state');
-          return const Center(child: CircularProgressIndicator());
-        },
-        error: (error, stack) {
-          print('🔍 ClassroomDetailScreen: Error state - $error');
-          print('🔍 ClassroomDetailScreen: Stack trace - $stack');
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text('Error loading classroom: $error'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => ref.refresh(classroomDetailsProvider(classroomId)),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        },
-        data: (classroom) {
-          print('🔍 ClassroomDetailScreen: Data loaded successfully');
-          print('🔍 ClassroomDetailScreen: Classroom data keys: ${classroom.keys.toList()}');
-          print('🔍 ClassroomDetailScreen: Classroom name: ${classroom['name']}');
-          print('🔍 ClassroomDetailScreen: Teacher data: ${classroom['teachers']}');
-          print('🔍 ClassroomDetailScreen: Pricing data: ${classroom['classroom_pricing']}');
-          return _buildClassroomDetails(context, ref, classroom);
-        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text('Error loading classroom: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.refresh(classroomDetailsProvider(classroomId)),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+        data: (classroom) => enrollmentStatusAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) => _buildClassroomDetails(context, ref, classroom, false),
+          data: (isEnrolled) => _buildClassroomDetails(context, ref, classroom, isEnrolled),
+        ),
       ),
     );
   }
 
-  Widget _buildClassroomDetails(BuildContext context, WidgetRef ref, Map<String, dynamic> classroom) {
-    print('🔍 _buildClassroomDetails: Processing classroom data');
+  Widget _buildClassroomDetails(BuildContext context, WidgetRef ref, Map<String, dynamic> classroom, bool isEnrolled) {
     final theme = Theme.of(context);
 
     // Debug pricing information
     final pricingList = classroom['classroom_pricing'] as List?;
-    print('🔍 _buildClassroomDetails: Pricing list: $pricingList');
-    print('🔍 _buildClassroomDetails: Pricing list length: ${pricingList?.length}');
-
-    final pricingInfo = pricingList?.firstOrNull as Map<String, dynamic>?;
-    print('🔍 _buildClassroomDetails: Pricing info: $pricingInfo');
-
-    final price = pricingInfo?['price'] ?? 0.0;
-    print('🔍 _buildClassroomDetails: Price: $price');
-
-    final paymentPlan = pricingInfo?['payment_plans'] as Map<String, dynamic>?;
-    print('🔍 _buildClassroomDetails: Payment plan: $paymentPlan');
-
-    final billingCycle = paymentPlan?['billing_cycle'] ?? 'month';
-    print('🔍 _buildClassroomDetails: Billing cycle: $billingCycle');
 
     // Debug teacher information
     final teacher = classroom['teachers'] as Map<String, dynamic>?;
-    print('🔍 _buildClassroomDetails: Teacher data: $teacher');
-
     final teacherUser = teacher?['users'] as Map<String, dynamic>?;
-    print('🔍 _buildClassroomDetails: Teacher user data: $teacherUser');
-    print('🔍 _buildClassroomDetails: Teacher name from classroom: ${classroom['teacher_name']}');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -125,14 +107,16 @@ class ClassroomDetailScreen extends ConsumerWidget {
                             backgroundColor: theme.colorScheme.secondaryContainer,
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '\$${price.toStringAsFixed(2)}',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
+                          if (pricingList != null && pricingList.isNotEmpty)
+                            Text('Starting from', style: theme.textTheme.bodySmall),
+                          if (pricingList != null && pricingList.isNotEmpty)
+                            Text(
+                              '\$${_getLowestPrice(pricingList).toStringAsFixed(2)}',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          Text('per $billingCycle', style: theme.textTheme.bodySmall),
                         ],
                       ),
                     ],
@@ -225,56 +209,81 @@ class ClassroomDetailScreen extends ConsumerWidget {
             const SizedBox(height: 16),
           ],
 
-          // Payment Plan Details
-          if (paymentPlan != null) ...[
+          // Pricing Plans Section
+          if (pricingList != null && pricingList.isNotEmpty) ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Payment Plan', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text('Choose Your Plan', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.payment, color: theme.colorScheme.primary),
-                      title: Text(paymentPlan['name'] ?? 'Standard Plan'),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (paymentPlan['description'] != null) Text(paymentPlan['description']),
-                          const SizedBox(height: 4),
-                          Text('Billing: Every $billingCycle', style: theme.textTheme.bodySmall),
-                        ],
-                      ),
-                      trailing: Text(
-                        '\$${price.toStringAsFixed(2)}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
+                    ...pricingList.map<Widget>((pricingInfo) {
+                      final price = pricingInfo['price'] ?? 0.0;
+                      final paymentPlan = pricingInfo['payment_plans'] as Map<String, dynamic>?;
+                      final billingCycle = paymentPlan?['billing_cycle'] ?? 'month';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: theme.colorScheme.outline.withOpacity(0.5)),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ),
-                    ),
-                    if (paymentPlan['features'] != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        'Included Features:',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      ...List<String>.from(paymentPlan['features']).map(
-                        (feature) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          title: Text(
+                            paymentPlan?['name'] ?? 'Standard Plan',
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.check_circle, size: 16, color: Colors.green[600]),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(feature)),
+                              if (paymentPlan?['description'] != null) ...[
+                                const SizedBox(height: 4),
+                                Text(paymentPlan!['description']),
+                              ],
+                              const SizedBox(height: 4),
+                              Text(
+                                'Billing: Every $billingCycle',
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
+                              ),
+                              if (paymentPlan?['features'] != null) ...[
+                                const SizedBox(height: 8),
+                                ...List<String>.from(paymentPlan!['features'])
+                                    .take(3)
+                                    .map(
+                                      (feature) => Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 1),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.check_circle, size: 14, color: Colors.green[600]),
+                                            const SizedBox(width: 6),
+                                            Expanded(child: Text(feature, style: theme.textTheme.bodySmall)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                              ],
+                            ],
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '\$${price.toStringAsFixed(2)}',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              Text('per $billingCycle', style: theme.textTheme.bodySmall),
                             ],
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ],
                 ),
               ),
@@ -283,33 +292,131 @@ class ClassroomDetailScreen extends ConsumerWidget {
           ],
 
           // Enroll Button
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => _handleEnrollment(context, classroom),
-              icon: const Icon(Icons.school),
-              label: const Text('Enroll Now'),
-              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+          if (pricingList != null && pricingList.isNotEmpty) ...[
+            Text(
+              pricingList.length > 1
+                  ? 'Choose your preferred plan during enrollment'
+                  : 'Ready to enroll in this classroom?',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
+            const SizedBox(height: 12),
+          ],
+
+          // Conditional UI based on enrollment status
+          if (isEnrolled) ...[
+            // Enrolled Student UI
+            Card(
+              color: Colors.green.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green.shade600),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'You are enrolled in this classroom',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _navigateToClassroom(context, classroom),
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Start Learning'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _viewProgress(context, classroom),
+                            icon: const Icon(Icons.analytics),
+                            label: const Text('View Progress'),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: Colors.green.shade600),
+                              foregroundColor: Colors.green.shade600,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            // Non-enrolled Student UI
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Ready to start your learning journey?',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _handleEnrollment(context, classroom),
+                        icon: const Icon(Icons.school),
+                        label: Text(
+                          pricingList != null && pricingList.length > 1 ? 'Choose Plan & Enroll' : 'Enroll Now',
+                        ),
+                        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   void _handleEnrollment(BuildContext context, Map<String, dynamic> classroom) {
-    print('🔍 _handleEnrollment: Starting enrollment process');
-    print('🔍 _handleEnrollment: Classroom ID: ${classroom['id']}');
-    print('🔍 _handleEnrollment: Classroom name: ${classroom['name']}');
-    print('🔍 _handleEnrollment: Pricing data: ${classroom['classroom_pricing']}');
-
     // Navigate to payment screen
-    print('🔍 _handleEnrollment: Navigating to payment screen');
     try {
       context.push('/payment', extra: {'classroom': classroom, 'action': 'enrollment'});
-      print('🔍 _handleEnrollment: Navigation successful');
     } catch (e) {
-      print('🔍 _handleEnrollment: Navigation error - $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Navigation error: $e')));
     }
+  }
+
+  void _navigateToClassroom(BuildContext context, Map<String, dynamic> classroom) {
+    // Navigate to classroom home for enrolled students
+    context.push('/classroom-home/${classroom['id']}');
+  }
+
+  void _viewProgress(BuildContext context, Map<String, dynamic> classroom) {
+    // TODO: Navigate to student progress screen
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Progress tracking coming soon!')));
   }
 }

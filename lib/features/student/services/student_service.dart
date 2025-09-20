@@ -30,7 +30,9 @@ class StudentService {
             student_id,
             grade_level,
             school_name,
-            learning_goals,
+            parent_contact,
+            emergency_contact_name,
+            emergency_contact_phone,
             board,
             status,
             users(

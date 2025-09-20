@@ -69,7 +69,6 @@ class AuthDebugService {
                 student_id,
                 grade_level,
                 school_name,
-                learning_goals,
                 board,
                 status,
                 created_at,

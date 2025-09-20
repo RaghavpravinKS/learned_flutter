@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
-import 'package:learned_flutter/features/debug/helpers/auth_debug_helper.dart';
 import 'package:learned_flutter/features/student/providers/student_profile_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,7 +18,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _schoolController = TextEditingController();
-  final _learningGoalsController = TextEditingController();
 
   String? _selectedGrade;
   String? _selectedBoard;
@@ -35,7 +33,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _lastNameController.dispose();
     _phoneController.dispose();
     _schoolController.dispose();
-    _learningGoalsController.dispose();
     super.dispose();
   }
 
@@ -46,7 +43,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _lastNameController.text = userInfo['last_name'] ?? '';
     _phoneController.text = studentProfile['phone'] ?? '';
     _schoolController.text = studentProfile['school_name'] ?? '';
-    _learningGoalsController.text = studentProfile['learning_goals'] ?? '';
 
     final gradeLevel = studentProfile['grade_level'];
     if (gradeLevel != null) {
@@ -87,9 +83,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           .update({
             'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
             'school_name': _schoolController.text.trim().isEmpty ? null : _schoolController.text.trim(),
-            'learning_goals': _learningGoalsController.text.trim().isEmpty
-                ? null
-                : _learningGoalsController.text.trim(),
             'grade_level': gradeNumber,
             'board': _selectedBoard,
             'updated_at': DateTime.now().toIso8601String(),
@@ -132,11 +125,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       appBar: AppBar(
         title: const Text('Edit Profile'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () => AuthDebugHelper.showAuthDebugDialog(context),
-            tooltip: 'Debug Authentication',
-          ),
           TextButton(
             onPressed: _isLoading ? null : _saveProfile,
             child: _isLoading
@@ -293,16 +281,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       _hasChanges = true;
                     }),
                     icon: Icons.account_balance_outlined,
-                  ),
-                  const SizedBox(height: 16),
-
-                  _buildFormField(
-                    label: 'Learning Goals',
-                    controller: _learningGoalsController,
-                    icon: Icons.psychology_outlined,
-                    maxLines: 3,
-                    required: false,
-                    hint: 'What would you like to achieve through learning?',
                   ),
                   const SizedBox(height: 32),
 
