@@ -87,7 +87,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         throw Exception('Failed to sign in');
       }
 
-      // Navigate to home on success
+      // Navigate based on user type
       if (mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,9 +98,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
 
-        // Navigate to home
+        // Navigate based on user type
         if (mounted) {
-          context.go('/home');
+          final userType = response.user?.userMetadata?['user_type'] ?? 'student';
+          if (userType == 'teacher') {
+            context.go('/teacher');
+          } else {
+            context.go('/student');
+          }
         }
       }
     } catch (e) {

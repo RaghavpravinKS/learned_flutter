@@ -837,7 +837,280 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function: Create teacher by admin
+-- =============================================
+-- TEACHER INVITATION SYSTEM
+-- =============================================
+
+-- Teacher invitations table
+CREATE TABLE IF NOT EXISTS public.teacher_invitations (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    email text NOT NULL UNIQUE,
+    first_name text NOT NULL,
+    last_name text NOT NULL,
+    subject text,
+    grade_levels integer[],
+    invited_by uuid REFERENCES public.users(id),
+    status text DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),
+    expires_at timestamp with time zone DEFAULT (now() + interval '7 days'),
+    accepted_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_teacher_invitations_email ON public.teacher_invitations(email);
+CREATE INDEX IF NOT EXISTS idx_teacher_invitations_status ON public.teacher_invitations(status);
+CREATE INDEX IF NOT EXISTS idx_teacher_invitations_expires ON public.teacher_invitations(expires_at);
+
+-- Function: Create teacher invitation (Admin only)
+CREATE OR REPLACE FUNCTION create_teacher_invitation(
+    p_email text,
+    p_first_name text,
+    p_last_name text,
+    p_subject text DEFAULT NULL,
+    p_grade_levels integer[] DEFAULT NULL,
+    p_admin_id uuid
+) RETURNS jsonb AS $$
+DECLARE
+    invitation_id uuid;
+BEGIN
+    -- Verify admin permissions
+    IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_admin_id AND user_type = 'admin') THEN
+        RAISE EXCEPTION 'Unauthorized: Admin access required';
+    END IF;
+    
+    -- Check if email already exists in system
+    IF EXISTS (SELECT 1 FROM public.users WHERE email = p_email) THEN
+        RAISE EXCEPTION 'Email already exists in system';
+    END IF;
+    
+    -- Check for existing pending invitations
+    IF EXISTS (SELECT 1 FROM public.teacher_invitations WHERE email = p_email AND status = 'pending') THEN
+        RAISE EXCEPTION 'Pending invitation already exists for this email';
+    END IF;
+    
+    -- Create invitation record
+    INSERT INTO public.teacher_invitations (
+        email, first_name, last_name, subject, grade_levels, invited_by
+    ) VALUES (
+        p_email, p_first_name, p_last_name, p_subject, p_grade_levels, p_admin_id
+    ) RETURNING id INTO invitation_id;
+    
+    -- Log the activity using existing audit_logs table
+    PERFORM log_audit_event(
+        p_user_id := p_admin_id,
+        p_action_type := 'teacher_invitation_created',
+        p_table_name := 'teacher_invitations',
+        p_record_id := invitation_id,
+        p_new_values := jsonb_build_object(
+            'email', p_email,
+            'first_name', p_first_name,
+            'last_name', p_last_name,
+            'subject', p_subject
+        ),
+        p_description := 'Teacher invitation created for: ' || p_email,
+        p_severity := 'info',
+        p_tags := ARRAY['invitation', 'teacher', 'admin'],
+        p_metadata := jsonb_build_object('expires_at', (now() + interval '7 days'))
+    );
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'invitation_id', invitation_id,
+        'email', p_email,
+        'expires_at', (now() + interval '7 days')::text,
+        'message', 'Teacher invitation created successfully'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Complete teacher onboarding (JWT validated)
+CREATE OR REPLACE FUNCTION complete_teacher_onboarding(
+    p_phone text DEFAULT NULL,
+    p_bio text DEFAULT NULL,
+    p_additional_subjects text[] DEFAULT NULL
+) RETURNS jsonb AS $$
+DECLARE
+    invitation_rec record;
+    teacher_id uuid;
+    generated_teacher_id text;
+    current_user_id uuid;
+    current_user_email text;
+    all_subjects text[];
+BEGIN
+    -- Get current user from JWT context
+    current_user_id := auth.uid();
+    
+    IF current_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required';
+    END IF;
+    
+    -- Get user email from auth.users
+    SELECT email INTO current_user_email FROM auth.users WHERE id = current_user_id;
+    
+    IF current_user_email IS NULL THEN
+        RAISE EXCEPTION 'Invalid user session';
+    END IF;
+    
+    -- Find valid invitation for this email
+    SELECT * INTO invitation_rec FROM public.teacher_invitations 
+    WHERE email = current_user_email 
+    AND status = 'pending' 
+    AND expires_at > now();
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No valid invitation found for email: %', current_user_email;
+    END IF;
+    
+    -- Generate teacher ID
+    generated_teacher_id := 'TEA' || to_char(now(), 'YYYYMMDD') || substr(current_user_id::text, 1, 6);
+    
+    -- Create user record in public.users table
+    INSERT INTO public.users (
+        id, email, user_type, first_name, last_name, phone,
+        is_active, email_verified, created_at, updated_at
+    ) VALUES (
+        current_user_id, current_user_email, 'teacher'::user_type,
+        invitation_rec.first_name, invitation_rec.last_name, p_phone,
+        true, true, now(), now()
+    );
+    
+    -- Combine subjects from invitation and additional
+    all_subjects := CASE 
+        WHEN invitation_rec.subject IS NOT NULL THEN ARRAY[invitation_rec.subject]
+        ELSE ARRAY[]::text[]
+    END;
+    
+    IF p_additional_subjects IS NOT NULL THEN
+        all_subjects := all_subjects || p_additional_subjects;
+    END IF;
+    
+    -- Create teacher record
+    INSERT INTO public.teachers (
+        user_id, teacher_id, specializations, bio,
+        status, created_at, updated_at
+    ) VALUES (
+        current_user_id, generated_teacher_id, all_subjects,
+        p_bio, 'active', now(), now()
+    ) RETURNING id INTO teacher_id;
+    
+    -- Mark invitation as accepted
+    UPDATE public.teacher_invitations 
+    SET status = 'accepted', accepted_at = now(), updated_at = now()
+    WHERE id = invitation_rec.id;
+    
+    -- Log completion using existing audit function
+    PERFORM log_audit_event(
+        p_user_id := current_user_id,
+        p_action_type := 'teacher_onboarding_completed',
+        p_table_name := 'teachers',
+        p_record_id := teacher_id,
+        p_new_values := jsonb_build_object(
+            'teacher_id', generated_teacher_id,
+            'user_id', current_user_id,
+            'specializations', all_subjects
+        ),
+        p_description := 'Teacher onboarding completed for: ' || current_user_email,
+        p_severity := 'info',
+        p_tags := ARRAY['onboarding', 'teacher', 'completed'],
+        p_metadata := jsonb_build_object('invitation_id', invitation_rec.id)
+    );
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'teacher_id', generated_teacher_id,
+        'user_id', current_user_id,
+        'email', current_user_email,
+        'message', 'Teacher onboarding completed successfully'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Get invitation status (Admin only)
+CREATE OR REPLACE FUNCTION get_teacher_invitations(
+    p_admin_id uuid
+) RETURNS TABLE (
+    id uuid,
+    email text,
+    first_name text,
+    last_name text,
+    subject text,
+    status text,
+    created_at timestamp with time zone,
+    expires_at timestamp with time zone,
+    accepted_at timestamp with time zone
+) AS $$
+BEGIN
+    -- Verify admin permissions
+    IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_admin_id AND user_type = 'admin') THEN
+        RAISE EXCEPTION 'Unauthorized: Admin access required';
+    END IF;
+    
+    RETURN QUERY
+    SELECT ti.id, ti.email, ti.first_name, ti.last_name, ti.subject, ti.status,
+           ti.created_at, ti.expires_at, ti.accepted_at
+    FROM public.teacher_invitations ti
+    ORDER BY ti.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Cancel invitation (Admin only)
+CREATE OR REPLACE FUNCTION cancel_teacher_invitation(
+    p_invitation_id uuid,
+    p_admin_id uuid
+) RETURNS jsonb AS $$
+BEGIN
+    -- Verify admin permissions
+    IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_admin_id AND user_type = 'admin') THEN
+        RAISE EXCEPTION 'Unauthorized: Admin access required';
+    END IF;
+    
+    -- Cancel invitation
+    UPDATE public.teacher_invitations 
+    SET status = 'cancelled', updated_at = now()
+    WHERE id = p_invitation_id AND status = 'pending';
+    
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invitation not found or already processed');
+    END IF;
+    
+    -- Log the cancellation
+    PERFORM log_audit_event(
+        p_user_id := p_admin_id,
+        p_action_type := 'teacher_invitation_cancelled',
+        p_table_name := 'teacher_invitations',
+        p_record_id := p_invitation_id,
+        p_description := 'Teacher invitation cancelled by admin',
+        p_severity := 'info',
+        p_tags := ARRAY['invitation', 'cancelled', 'admin']
+    );
+    
+    RETURN jsonb_build_object('success', true, 'message', 'Invitation cancelled successfully');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Cleanup expired invitations (run periodically)
+CREATE OR REPLACE FUNCTION cleanup_expired_invitations()
+RETURNS integer AS $$
+DECLARE
+    expired_count integer;
+BEGIN
+    UPDATE public.teacher_invitations 
+    SET status = 'expired', updated_at = now()
+    WHERE status = 'pending' AND expires_at < now();
+    
+    GET DIAGNOSTICS expired_count = ROW_COUNT;
+    
+    -- Log cleanup activity
+    INSERT INTO public.trigger_logs (message, metadata)
+    VALUES ('Expired invitations cleanup completed', 
+            jsonb_build_object('expired_count', expired_count, 'timestamp', now()));
+    
+    RETURN expired_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: Create teacher by admin (DEPRECATED - use invitation system instead)
 CREATE OR REPLACE FUNCTION create_teacher_by_admin(
     p_admin_id uuid,
     p_email text,
@@ -848,60 +1121,32 @@ CREATE OR REPLACE FUNCTION create_teacher_by_admin(
     p_bio text,
     p_experience_years integer,
     p_specializations text,
+    p_password text DEFAULT 'TempPass123!',
     p_metadata jsonb DEFAULT '{}'::jsonb
 )
 RETURNS jsonb AS $$
-DECLARE
-    v_user_id uuid;
-    v_teacher_id uuid;
-    v_teacher_id_val text;
 BEGIN
-    -- Validate admin user
-    IF NOT EXISTS (SELECT 1 FROM users WHERE id = p_admin_id AND user_type = 'admin') THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Unauthorized: Admin access required');
-    END IF;
-
-    -- Generate teacher ID
-    v_teacher_id_val := 'TEA' || to_char(now(), 'YYYYMMDD') || substr(gen_random_uuid()::text, 1, 6);
-
-    -- Create user record
-    INSERT INTO users (
-        email, user_type, first_name, last_name, phone,
-        is_active, email_verified, created_at, updated_at
-    ) VALUES (
-        p_email, 'teacher', p_first_name, p_last_name, p_phone,
-        true, true, now(), now()
-    ) RETURNING id INTO v_user_id;
-
-    -- Create teacher record
-    INSERT INTO teachers (
-        user_id, teacher_id, qualifications, experience_years,
-        bio, status, created_at, updated_at
-    ) VALUES (
-        v_user_id, v_teacher_id_val, p_qualifications, p_experience_years,
-        p_bio, 'active', now(), now()
-    ) RETURNING id INTO v_teacher_id;
-
-    -- Log admin activity
-    INSERT INTO admin_activities (
-        admin_id, activity_type, target_user_id, description, metadata, created_at
-    ) VALUES (
-        p_admin_id, 'create_teacher', v_user_id, 
-        'Created teacher account: ' || p_first_name || ' ' || p_last_name,
-        p_metadata, now()
-    );
-
+    -- This function is now deprecated in favor of the invitation system
     RETURN jsonb_build_object(
-        'success', true,
-        'user_id', v_user_id,
-        'teacher_id', v_teacher_id,
-        'teacher_id_val', v_teacher_id_val,
-        'message', 'Teacher account created successfully'
+        'success', false, 
+        'error', 'DEPRECATED: Use create_teacher_invitation() instead for secure teacher onboarding',
+        'recommendation', 'Use the new teacher invitation system with magic links'
     );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+-- Test helper: Create teacher invitation for UI testing
+CREATE OR REPLACE FUNCTION create_test_teacher_invitation_for_ui()
+RETURNS jsonb AS $$
+BEGIN
+    RETURN create_teacher_invitation(
+        'test.teacher@learned.com',
+        'Test',
+        'Teacher',
+        'Mathematics',
+        ARRAY[1, 2, 3],
+        '00000000-0000-0000-0000-000000000000'::uuid -- dummy admin ID for testing
+    );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -1210,6 +1455,7 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.classrooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
@@ -1243,6 +1489,18 @@ CREATE POLICY "Anyone can read student existence for enrollment counting" ON pub
 -- Teachers policies (public read access for teacher profile information)
 CREATE POLICY "Anyone can view teacher profiles" ON public.teachers
     FOR SELECT USING (status = 'active');
+
+-- Teacher invitations policies (admin only)
+CREATE POLICY "Admins can manage all invitations" ON public.teacher_invitations
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND user_type = 'admin')
+    );
+
+-- Allow authenticated users to check their own invitation status
+CREATE POLICY "Users can view their own pending invitations" ON public.teacher_invitations
+    FOR SELECT USING (
+        email = (SELECT email FROM auth.users WHERE id = auth.uid()) AND status = 'pending'
+    );
 
 -- Additional users policy for teacher profile access
 CREATE POLICY "Anyone can view teacher user profiles" ON public.users
@@ -1366,6 +1624,11 @@ GRANT SELECT ON public.payment_plans TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.student_enrollments TO authenticated;
 GRANT SELECT, INSERT ON public.payments TO authenticated;
 GRANT SELECT ON public.students TO authenticated;
+
+-- Grant permissions for teacher invitations
+GRANT SELECT ON public.teacher_invitations TO authenticated;
+GRANT INSERT ON public.teacher_invitations TO authenticated;
+GRANT UPDATE ON public.teacher_invitations TO authenticated;
 
 -- =============================================
 -- SCHEMA SETUP COMPLETE

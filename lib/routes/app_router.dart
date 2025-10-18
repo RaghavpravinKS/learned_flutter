@@ -26,6 +26,9 @@ import 'package:learned_flutter/features/student/screens/learning_materials_scre
 import 'package:learned_flutter/features/student/screens/material_viewer_screen.dart';
 import 'package:learned_flutter/features/student/screens/payment_screen.dart';
 import 'package:learned_flutter/features/student/models/assignment_model.dart';
+import 'package:learned_flutter/features/teacher/screens/teacher_dashboard_screen.dart';
+import 'package:learned_flutter/features/teacher/screens/my_classrooms_screen.dart';
+import 'package:learned_flutter/features/teacher/screens/assignment_management_screen.dart';
 import 'package:learned_flutter/features/debug/screens/database_test_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -346,9 +349,42 @@ final router = GoRouter(
       ],
     ),
 
-    // Home route (redirects to student dashboard for now)
-    GoRoute(path: '/home', redirect: (context, state) => '/student'),
+    // Teacher routes
+    GoRoute(
+      path: '/teacher',
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const TeacherDashboardScreen()),
+      routes: [
+        // Dashboard
+        GoRoute(
+          path: 'dashboard',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const TeacherDashboardScreen()),
+        ),
+        // Classrooms
+        GoRoute(
+          path: 'classrooms',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const MyClassroomsScreen()),
+        ),
+        // Assignments
+        GoRoute(
+          path: 'assignments',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const AssignmentManagementScreen()),
+        ),
+        // Materials
+        GoRoute(
+          path: 'materials',
+          pageBuilder: (context, state) => MaterialPage(
+            key: state.pageKey,
+            child: const Scaffold(body: Center(child: Text('Teacher Materials - Coming Soon'))),
+          ),
+        ),
+      ],
+    ),
 
+    // Home route (redirects based on user type)
+    GoRoute(
+      path: '/home',
+      redirect: (context, state) => '/student',
+    ), // TODO: Check user type and redirect appropriately
     // Payment route
     GoRoute(
       path: '/payment',

@@ -43,13 +43,20 @@ class _SplashScreenState extends State<SplashScreen> {
     print('🔍 Splash: Session expires at: ${session?.expiresAt}');
 
     if (user != null && session != null) {
-      // User is authenticated, go directly to student dashboard
-      print('🔍 Splash: User authenticated, navigating to dashboard');
+      // User is authenticated, navigate based on user type
+      final userType = user.userMetadata?['user_type'] ?? 'student';
+      print('🔍 Splash: User authenticated as $userType, navigating to dashboard');
       setState(() {
         _statusText = 'Welcome back!';
       });
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) context.go('/student');
+      if (mounted) {
+        if (userType == 'teacher') {
+          context.go('/teacher');
+        } else {
+          context.go('/student');
+        }
+      }
     } else {
       // User not authenticated, go to welcome screen
       print('🔍 Splash: User not authenticated, navigating to welcome');
