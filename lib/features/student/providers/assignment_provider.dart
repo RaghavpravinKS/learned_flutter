@@ -11,29 +11,40 @@ final assignmentRepositoryProvider = Provider<AssignmentRepository>((ref) {
 final upcomingAssignmentsProvider = FutureProvider.autoDispose<List<Assignment>>((ref) async {
   final repository = ref.watch(assignmentRepositoryProvider);
   final userId = Supabase.instance.client.auth.currentUser?.id;
-  
+
   if (userId == null) {
     throw Exception('User not authenticated');
   }
-  
+
   return repository.getUpcomingAssignments(userId);
+});
+
+// Provider to get assignments for a specific classroom
+final classroomAssignmentsProvider = FutureProvider.autoDispose.family<List<Assignment>, String>((
+  ref,
+  classroomId,
+) async {
+  final repository = ref.watch(assignmentRepositoryProvider);
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+
+  if (userId == null) {
+    throw Exception('User not authenticated');
+  }
+
+  // Get all upcoming assignments and filter by classroom
+  final allAssignments = await repository.getUpcomingAssignments(userId);
+  return allAssignments.where((assignment) => assignment.classId == classroomId).toList();
 });
 
 class AssignmentNotifier extends StateNotifier<AsyncValue<void>> {
   final AssignmentRepository _repository;
-  
+
   AssignmentNotifier(this._repository) : super(const AsyncValue.data(null));
-  
-  Future<void> submitAssignment({
-    required String assignmentId,
-    required String submissionUrl,
-  }) async {
+
+  Future<void> submitAssignment({required String assignmentId, required String submissionUrl}) async {
     try {
       state = const AsyncValue.loading();
-      await _repository.submitAssignment(
-        assignmentId: assignmentId,
-        submissionUrl: submissionUrl,
-      );
+      await _repository.submitAssignment(assignmentId: assignmentId, submissionUrl: submissionUrl);
       state = const AsyncValue.data(null);
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);

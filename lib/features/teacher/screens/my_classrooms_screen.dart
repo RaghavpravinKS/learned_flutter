@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../services/teacher_service.dart';
+import 'classroom_detail_screen.dart';
 
 class MyClassroomsScreen extends ConsumerStatefulWidget {
   const MyClassroomsScreen({super.key});
@@ -52,19 +52,6 @@ class _MyClassroomsScreenState extends ConsumerState<MyClassroomsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('My Classrooms', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loadClassrooms)],
-      ),
-      body: _buildBody(),
-    );
-  }
-
-  Widget _buildBody() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -109,17 +96,6 @@ class _MyClassroomsScreenState extends ConsumerState<MyClassroomsScreen> {
               'Contact your administrator to get assigned to classrooms.',
               style: TextStyle(color: Colors.grey[600], fontSize: 16),
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => context.pop(),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Back to Dashboard'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
             ),
           ],
         ),
@@ -243,10 +219,10 @@ class _MyClassroomsScreenState extends ConsumerState<MyClassroomsScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to classroom details
-          ScaffoldMessenger.of(
+          Navigator.push(
             context,
-          ).showSnackBar(SnackBar(content: Text('Classroom details coming soon for ${classroom['name']}')));
+            MaterialPageRoute(builder: (context) => ClassroomDetailScreen(classroomId: classroom['id'])),
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(

@@ -34,64 +34,101 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Calendar View
-          TableCalendar(
-            firstDay: DateTime.utc(2023, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            focusedDay: _focusedDay,
-            selectedDayPredicate: (day) {
-              return isSameDay(_selectedDay, day);
-            },
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-              });
-            },
-            calendarFormat: _calendarFormat,
-            onFormatChanged: (format) {
-              setState(() {
-                _calendarFormat = format;
-              });
-            },
-            onPageChanged: (focusedDay) {
-              _focusedDay = focusedDay;
-            },
-            headerStyle: HeaderStyle(
-              formatButtonVisible: true,
-              titleCentered: true,
-              formatButtonShowsNext: false,
-              formatButtonDecoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              formatButtonTextStyle: const TextStyle(color: Colors.white),
-            ),
-            calendarStyle: CalendarStyle(
-              todayDecoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              selectedDecoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          const Divider(),
-          // Schedule List
-          Expanded(
-            child: _buildScheduleList(),
-          ),
-        ],
+      body: ScheduleBody(
+        focusedDay: _focusedDay,
+        selectedDay: _selectedDay,
+        calendarFormat: _calendarFormat,
+        onDaySelected: (selectedDay, focusedDay) {
+          setState(() {
+            _selectedDay = selectedDay;
+            _focusedDay = focusedDay;
+          });
+        },
+        onFormatChanged: (format) {
+          setState(() {
+            _calendarFormat = format;
+          });
+        },
+        onPageChanged: (focusedDay) {
+          setState(() {
+            _focusedDay = focusedDay;
+          });
+        },
+        onTodayPressed: () {
+          setState(() {
+            _focusedDay = DateTime.now();
+            _selectedDay = _focusedDay;
+          });
+        },
       ),
     );
   }
+}
 
-  Widget _buildScheduleList() {
-    final sessionsAsync = ref.watch(selectedDaySessionsProvider(_selectedDay ?? _focusedDay));
+// Separate body widget that can be used independently
+class ScheduleBody extends ConsumerWidget {
+  final DateTime focusedDay;
+  final DateTime? selectedDay;
+  final CalendarFormat calendarFormat;
+  final void Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
+  final void Function(CalendarFormat format) onFormatChanged;
+  final void Function(DateTime focusedDay) onPageChanged;
+  final VoidCallback onTodayPressed;
+
+  const ScheduleBody({
+    super.key,
+    required this.focusedDay,
+    required this.selectedDay,
+    required this.calendarFormat,
+    required this.onDaySelected,
+    required this.onFormatChanged,
+    required this.onPageChanged,
+    required this.onTodayPressed,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      children: [
+        // Calendar View
+        TableCalendar(
+          firstDay: DateTime.utc(2023, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: focusedDay,
+          selectedDayPredicate: (day) {
+            return isSameDay(selectedDay, day);
+          },
+          onDaySelected: onDaySelected,
+          calendarFormat: calendarFormat,
+          onFormatChanged: onFormatChanged,
+          onPageChanged: onPageChanged,
+          headerStyle: HeaderStyle(
+            formatButtonVisible: true,
+            titleCentered: true,
+            formatButtonShowsNext: false,
+            formatButtonDecoration: BoxDecoration(
+              color: Theme.of(context).primaryColor,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            formatButtonTextStyle: const TextStyle(color: Colors.white),
+          ),
+          calendarStyle: CalendarStyle(
+            todayDecoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            selectedDecoration: BoxDecoration(color: Theme.of(context).primaryColor, shape: BoxShape.circle),
+          ),
+        ),
+        const Divider(),
+        // Schedule List
+        Expanded(child: _buildScheduleList(context, ref)),
+      ],
+    );
+  }
+
+  Widget _buildScheduleList(BuildContext context, WidgetRef ref) {
+    final sessionsAsync = ref.watch(selectedDaySessionsProvider(selectedDay ?? focusedDay));
 
     return sessionsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -103,10 +140,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             const SizedBox(height: 16),
             Text('Error loading schedule: $error'),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.refresh(scheduleProvider.future),
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: () => ref.refresh(scheduleProvider.future), child: const Text('Retry')),
           ],
         ),
       ),
@@ -116,16 +150,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.event_busy,
-                  size: 64,
-                  color: Theme.of(context).disabledColor,
-                ),
+                Icon(Icons.event_busy, size: 64, color: Theme.of(context).disabledColor),
                 const SizedBox(height: 16),
-                Text(
-                  'No sessions scheduled',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text('No sessions scheduled', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Text(
                   'Check back later or contact your teacher',
@@ -149,22 +176,16 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               final classroom = session['classrooms'] as Map<String, dynamic>? ?? {};
               final teacher = classroom['teacher'] as Map<String, dynamic>? ?? {};
               final subject = session['subject'] as Map<String, dynamic>? ?? {};
-              
+
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(16),
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                    child: Icon(
-                      Icons.video_call,
-                      color: Theme.of(context).primaryColor,
-                    ),
+                    child: Icon(Icons.video_call, color: Theme.of(context).primaryColor),
                   ),
-                  title: Text(
-                    subject['name'] ?? 'No Subject',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  title: Text(subject['name'] ?? 'No Subject', style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -192,9 +213,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                             const SizedBox(width: 4),
                             Text(
                               'Online Session',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).primaryColor,
-                              ),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(color: Theme.of(context).primaryColor),
                             ),
                           ],
                         ),
@@ -204,10 +225,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
                     if (session['meeting_url'] != null) {
-                      context.go(
-                        '/student/schedule/session/join/${session['id']}',
-                        extra: session,
-                      );
+                      context.go('/student/schedule/session/join/${session['id']}', extra: session);
                     }
                   },
                 ),

@@ -1,548 +1,386 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learned_flutter/core/theme/app_colors.dart';
+import 'package:learned_flutter/features/student/providers/classroom_provider.dart';
+import 'package:learned_flutter/features/student/providers/assignment_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class ProgressScreen extends ConsumerStatefulWidget {
+class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
 
   @override
-  ConsumerState<ProgressScreen> createState() => _ProgressScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enrolledClassroomsAsync = ref.watch(enrolledClassroomsProvider);
 
-class _ProgressScreenState extends ConsumerState<ProgressScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-  
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Progress'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Overview'),
-            Tab(text: 'Courses'),
-            Tab(text: 'Assessments'),
+    return enrolledClassroomsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('Error loading progress: $error'),
           ],
-          labelColor: theme.primaryColor,
-          indicatorColor: theme.primaryColor,
-          unselectedLabelColor: theme.hintColor,
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      data: (classrooms) {
+        if (classrooms.isEmpty) {
+          return _buildEmptyState();
+        }
+        return _buildProgressList(context, ref, classrooms);
+      },
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildOverviewTab(),
-          _buildCoursesTab(),
-          _buildAssessmentsTab(),
+          Icon(Icons.school_outlined, size: 80, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'No Classrooms Yet',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 8),
+          Text('Enroll in classrooms to track your progress', style: TextStyle(color: Colors.grey.shade600)),
         ],
       ),
     );
   }
-  
-  Widget _buildOverviewTab() {
-    // Mock data - replace with actual data from provider
-    final totalCourses = 5;
-    final completedCourses = 2;
-    final inProgressCourses = 2;
-    final totalAssignments = 24;
-    final completedAssignments = 15;
-    final averageGrade = 87.5;
-    
-    final progressPercentage = (completedCourses / totalCourses * 100).round();
-    final assignmentsPercentage = (completedAssignments / totalAssignments * 100).round();
-    // assignmentsPercentage is used in the UI for the assignments progress indicator
-    
-    return SingleChildScrollView(
+
+  Widget _buildProgressList(BuildContext context, WidgetRef ref, List<Map<String, dynamic>> classrooms) {
+    return ListView.builder(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Progress Summary Card
-          Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
+      itemCount: classrooms.length,
+      itemBuilder: (context, index) {
+        final classroom = classrooms[index];
+        final classroomId = classroom['id'] as String;
+        final classroomName = classroom['name'] as String;
+        final subject = classroom['subject'] as String? ?? '';
+        final gradeLevel = (classroom['grade_level'] as int?)?.toString() ?? '';
+
+        return _buildClassroomProgressCard(context, ref, classroomId, classroomName, subject, gradeLevel);
+      },
+    );
+  }
+
+  Widget _buildClassroomProgressCard(
+    BuildContext context,
+    WidgetRef ref,
+    String classroomId,
+    String classroomName,
+    String subject,
+    String gradeLevel,
+  ) {
+    final theme = Theme.of(context);
+    final attendanceAsync = ref.watch(classroomAttendanceProvider(classroomId));
+    final assignmentsAsync = ref.watch(classroomAssignmentsProvider(classroomId));
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () => context.push('/classroom-home/$classroomId'),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Classroom Header
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Overall Progress',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        '$progressPercentage%',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  LinearProgressIndicator(
-                    value: progressPercentage / 100,
-                    backgroundColor: Colors.grey[200],
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    minHeight: 12,
-                    borderRadius: BorderRadius.circular(6),
+                    child: Icon(Icons.school, color: AppColors.primary, size: 24),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Completed: $completedCourses of $totalCourses courses',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      Text(
-                        '$completedAssignments of $totalAssignments assignments',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(classroomName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        Text(
+                          '$subject • Grade $gradeLevel',
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
                   ),
+                  Icon(Icons.chevron_right, color: Colors.grey.shade400),
                 ],
               ),
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Quick Stats
-          Text(
-            'Quick Stats',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            childAspectRatio: 1.5,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            children: [
-              _buildStatCard(
-                'Average Grade',
-                '${averageGrade.toStringAsFixed(1)}%',
-                Icons.school,
-                Colors.blue,
-              ),
-              _buildStatCard(
-                'In Progress',
-                '$inProgressCourses Courses',
-                Icons.hourglass_bottom,
-                Colors.orange,
-              ),
-              _buildStatCard(
-                'Assignments',
-                '$completedAssignments/$totalAssignments',
-                Icons.assignment_turned_in,
-                Colors.green,
-              ),
-              _buildStatCard(
-                'Completion',
-                '$progressPercentage%',
-                Icons.flag,
-                Colors.purple,
-              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Attendance Section
+              _buildAttendanceSection(theme, attendanceAsync),
+
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Grades Section
+              _buildGradesSection(theme, assignmentsAsync),
             ],
           ),
-          
-          const SizedBox(height: 24),
-          
-          // Recent Activity
-          Text(
-            'Recent Activity',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildActivityItem(
-            'Completed "Introduction to Flutter"',
-            '2 hours ago',
-            Icons.check_circle,
-            Colors.green,
-          ),
-          _buildActivityItem(
-            'Submitted Assignment #5',
-            '1 day ago',
-            Icons.assignment_turned_in,
-            Colors.blue,
-          ),
-          _buildActivityItem(
-            'Started "Advanced State Management"',
-            '3 days ago',
-            Icons.play_circle_fill,
-            Colors.orange,
-          ),
-          _buildActivityItem(
-            'Completed Quiz #3 with 92%',
-            '1 week ago',
-            Icons.quiz,
-            Colors.purple,
-          ),
-          
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
   }
-  
-  Widget _buildCoursesTab() {
-    // Mock data - replace with actual data from provider
-    final courses = [
-      {
-        'title': 'Introduction to Flutter',
-        'instructor': 'Jane Smith',
-        'progress': 1.0,
-        'completed': true,
-        'grade': 95,
-      },
-      {
-        'title': 'Advanced State Management',
-        'instructor': 'John Doe',
-        'progress': 0.6,
-        'completed': false,
-        'grade': null,
-      },
-      {
-        'title': 'UI/UX Design for Developers',
-        'instructor': 'Alex Johnson',
-        'progress': 0.3,
-        'completed': false,
-        'grade': null,
-      },
-      {
-        'title': 'Testing in Flutter',
-        'instructor': 'Sarah Williams',
-        'progress': 0.0,
-        'completed': false,
-        'grade': null,
-      },
-    ];
-    
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: courses.length,
-      itemBuilder: (context, index) {
-        final course = courses[index];
-        final progress = course['progress'] as double;
-        final completed = course['completed'] as bool;
-        final grade = course['grade'] as int?;
-        
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+
+  Widget _buildAttendanceSection(ThemeData theme, AsyncValue<Map<String, dynamic>> attendanceAsync) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text('Attendance', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        attendanceAsync.when(
+          loading: () => const Center(child: SizedBox(height: 40, child: CircularProgressIndicator())),
+          error: (error, stack) =>
+              Text('Unable to load attendance', style: TextStyle(color: Colors.red.shade600, fontSize: 12)),
+          data: (stats) {
+            final totalSessions = stats['totalSessions'] as int;
+            final attended = stats['attended'] as int;
+            final attendanceRate = stats['attendanceRate'] as double;
+
+            if (totalSessions == 0) {
+              return Text('No sessions yet', style: TextStyle(color: Colors.grey.shade600, fontSize: 12));
+            }
+
+            return Column(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        course['title'] as String,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (completed)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.check_circle, size: 16, color: Colors.green[700]),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Completed',
-                              style: TextStyle(
-                                color: Colors.green[700],
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Instructor: ${course['instructor']}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.grey[200],
+                        value: attendanceRate / 100,
+                        backgroundColor: Colors.grey.shade300,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          completed ? Colors.green : Theme.of(context).primaryColor,
+                          attendanceRate >= 75
+                              ? Colors.green
+                              : attendanceRate >= 50
+                              ? Colors.orange
+                              : Colors.red,
                         ),
                         minHeight: 8,
-                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Text(
-                      '${(progress * 100).round()}%',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      '${attendanceRate.toStringAsFixed(0)}%',
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: attendanceRate >= 75
+                            ? Colors.green
+                            : attendanceRate >= 50
+                            ? Colors.orange
+                            : Colors.red,
                       ),
                     ),
                   ],
                 ),
-                if (grade != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.grade, size: 16, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Grade: $grade%',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-  
-  Widget _buildAssessmentsTab() {
-    // Mock data - replace with actual data from provider
-    final assessments = [
-      {
-        'title': 'Mid-term Exam',
-        'course': 'Introduction to Flutter',
-        'score': 92,
-        'total': 100,
-        'date': '2023-05-15',
-        'passed': true,
-      },
-      {
-        'title': 'Assignment #3',
-        'course': 'Advanced State Management',
-        'score': 45,
-        'total': 50,
-        'date': '2023-05-10',
-        'passed': true,
-      },
-      {
-        'title': 'Quiz #2',
-        'course': 'UI/UX Design',
-        'score': 38,
-        'total': 50,
-        'date': '2023-05-05',
-        'passed': true,
-      },
-      {
-        'title': 'Final Project',
-        'course': 'Testing in Flutter',
-        'score': null,
-        'total': 100,
-        'date': '2023-06-20',
-        'passed': null,
-      },
-    ];
-    
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: assessments.length,
-      itemBuilder: (context, index) {
-        final assessment = assessments[index];
-        final score = assessment['score'] as int?;
-        final total = assessment['total'] as int;
-        final passed = assessment['passed'] as bool?;
-        final percentage = score != null ? (score / total * 100).round() : null;
-        
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  assessment['title'] as String,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  assessment['course'] as String,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (score != null) ...[
-                      Container(
-                        width: 60,
-                        height: 60,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: passed! ? Colors.green : Colors.red,
-                            width: 3,
-                          ),
-                        ),
-                        child: Text(
-                          '$score/$total',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: passed ? Colors.green : Colors.red,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${percentage!}%',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: passed ? Colors.green : Colors.red,
-                            ),
-                          ),
-                          Text(
-                            passed ? 'Passed' : 'Failed',
-                            style: TextStyle(
-                              color: passed ? Colors.green : Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ] else ...[
-                      const Icon(Icons.timer, size: 24, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      const Text('Not submitted yet'),
-                    ],
-                    const Spacer(),
                     Text(
-                      assessment['date'] as String,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      '$attended of $totalSessions sessions attended',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          attendanceRate >= 75 ? Icons.trending_up : Icons.trending_down,
+                          size: 16,
+                          color: attendanceRate >= 75 ? Colors.green : Colors.red,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          attendanceRate >= 75 ? 'Good' : 'Needs Improvement',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: attendanceRate >= 75 ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ],
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ],
     );
   }
-  
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+  Widget _buildGradesSection(ThemeData theme, AsyncValue<List> assignmentsAsync) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).textTheme.titleLarge?.color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).hintColor,
-              ),
-            ),
+            Icon(Icons.grade, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text('Grades', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
           ],
         ),
+        const SizedBox(height: 12),
+        assignmentsAsync.when(
+          loading: () => const Center(child: SizedBox(height: 40, child: CircularProgressIndicator())),
+          error: (error, stack) =>
+              Text('Unable to load grades', style: TextStyle(color: Colors.red.shade600, fontSize: 12)),
+          data: (assignments) {
+            final gradedAssignments = assignments.where((a) => a.status == 'graded' && a.grade != null).toList();
+
+            if (gradedAssignments.isEmpty) {
+              return Text('No graded assignments yet', style: TextStyle(color: Colors.grey.shade600, fontSize: 12));
+            }
+
+            // Calculate average grade
+            final totalGrade = gradedAssignments.fold<double>(0, (sum, a) => sum + (a.grade ?? 0));
+            final averageGrade = totalGrade / gradedAssignments.length;
+
+            return Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Average Grade', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${averageGrade.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: _getGradeColor(averageGrade),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('Graded Assignments', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${gradedAssignments.length}',
+                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Grade distribution
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildGradeIndicator(
+                        'A',
+                        gradedAssignments.where((a) => (a.grade ?? 0) >= 90).length,
+                        Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildGradeIndicator(
+                        'B',
+                        gradedAssignments.where((a) => (a.grade ?? 0) >= 80 && (a.grade ?? 0) < 90).length,
+                        Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildGradeIndicator(
+                        'C',
+                        gradedAssignments.where((a) => (a.grade ?? 0) >= 70 && (a.grade ?? 0) < 80).length,
+                        Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildGradeIndicator(
+                        'D/F',
+                        gradedAssignments.where((a) => (a.grade ?? 0) < 70).length,
+                        Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGradeIndicator(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        children: [
+          Text(
+            count.toString(),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+          ),
+          Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
+        ],
       ),
     );
   }
-  
-  Widget _buildActivityItem(String title, String time, IconData icon, Color color) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: color, size: 20),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.bodyMedium,
-      ),
-      subtitle: Text(
-        time,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-    );
+
+  Color _getGradeColor(double grade) {
+    if (grade >= 90) return Colors.green;
+    if (grade >= 80) return Colors.blue;
+    if (grade >= 70) return Colors.orange;
+    return Colors.red;
   }
 }
+
+// Provider for enrolled classrooms
+final enrolledClassroomsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+
+  if (userId == null) {
+    throw Exception('User not authenticated');
+  }
+
+  // Get student record
+  final studentResponse = await supabase.from('students').select('id').eq('user_id', userId).single();
+
+  final studentId = studentResponse['id'] as String;
+
+  // Get enrolled classrooms
+  final enrollmentsResponse = await supabase
+      .from('student_enrollments')
+      .select('classroom_id, classrooms(id, name, subject, grade_level)')
+      .eq('student_id', studentId)
+      .eq('status', 'active');
+
+  final enrollments = enrollmentsResponse as List;
+  return enrollments.map((e) => e['classrooms'] as Map<String, dynamic>).toList();
+});

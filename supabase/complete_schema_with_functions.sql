@@ -1631,6 +1631,130 @@ GRANT INSERT ON public.teacher_invitations TO authenticated;
 GRANT UPDATE ON public.teacher_invitations TO authenticated;
 
 -- =============================================
+-- UPDATED TEACHER INVITATION FUNCTIONS (Fixed Auth Issues)
+-- =============================================
+
+-- Fixed function with proper auth.users email handling
+CREATE OR REPLACE FUNCTION complete_teacher_onboarding(
+    p_phone text DEFAULT NULL,
+    p_bio text DEFAULT NULL,
+    p_additional_subjects text[] DEFAULT NULL
+) RETURNS jsonb AS $$
+DECLARE
+    invitation_rec record;
+    teacher_id uuid;
+    generated_teacher_id text;
+    current_user_id uuid;
+    current_user_email text;
+    all_subjects text[];
+BEGIN
+    -- Get current user from JWT context
+    current_user_id := auth.uid();
+    
+    IF current_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required';
+    END IF;
+    
+    -- Get user email from auth.users (handling different schema versions)
+    SELECT COALESCE(email, raw_user_meta_data->>'email') INTO current_user_email FROM auth.users WHERE id = current_user_id;
+    
+    IF current_user_email IS NULL THEN
+        RAISE EXCEPTION 'Invalid user session - no email found';
+    END IF;
+    
+    -- Find valid invitation for this email
+    SELECT * INTO invitation_rec FROM public.teacher_invitations 
+    WHERE email = current_user_email 
+    AND status = 'pending' 
+    AND expires_at > now();
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No valid invitation found for email: %', current_user_email;
+    END IF;
+    
+    -- Generate teacher ID
+    generated_teacher_id := 'TEA' || to_char(now(), 'YYYYMMDD') || substr(current_user_id::text, 1, 6);
+    
+    -- Create user record in public.users table
+    INSERT INTO public.users (
+        id, email, user_type, first_name, last_name, phone,
+        is_active, email_verified, created_at, updated_at
+    ) VALUES (
+        current_user_id, current_user_email, 'teacher'::user_type,
+        invitation_rec.first_name, invitation_rec.last_name, p_phone,
+        true, true, now(), now()
+    );
+    
+    -- Combine subjects from invitation and additional
+    all_subjects := CASE 
+        WHEN invitation_rec.subject IS NOT NULL THEN ARRAY[invitation_rec.subject]
+        ELSE ARRAY[]::text[]
+    END;
+    
+    IF p_additional_subjects IS NOT NULL THEN
+        all_subjects := all_subjects || p_additional_subjects;
+    END IF;
+    
+    -- Create teacher record
+    INSERT INTO public.teachers (
+        user_id, teacher_id, specializations, bio,
+        status, created_at, updated_at
+    ) VALUES (
+        current_user_id, generated_teacher_id, all_subjects,
+        p_bio, 'active', now(), now()
+    ) RETURNING id INTO teacher_id;
+    
+    -- Mark invitation as accepted
+    UPDATE public.teacher_invitations 
+    SET status = 'accepted', accepted_at = now(), updated_at = now()
+    WHERE id = invitation_rec.id;
+    
+    -- Log completion (with fallback if audit function doesn't exist)
+    BEGIN
+        PERFORM log_audit_event(
+            p_user_id := current_user_id,
+            p_action_type := 'teacher_onboarding_completed',
+            p_table_name := 'teachers',
+            p_record_id := teacher_id,
+            p_new_values := jsonb_build_object(
+                'teacher_id', generated_teacher_id,
+                'user_id', current_user_id,
+                'specializations', all_subjects
+            ),
+            p_description := 'Teacher onboarding completed for: ' || current_user_email,
+            p_severity := 'info',
+            p_tags := ARRAY['onboarding', 'teacher', 'completed'],
+            p_metadata := jsonb_build_object('invitation_id', invitation_rec.id)
+        );
+    EXCEPTION
+        WHEN undefined_function THEN
+            INSERT INTO public.trigger_logs (message, metadata) VALUES (
+                'Teacher onboarding completed',
+                jsonb_build_object('email', current_user_email, 'teacher_id', generated_teacher_id)
+            );
+    END;
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'teacher_id', generated_teacher_id,
+        'user_id', current_user_id,
+        'email', current_user_email,
+        'message', 'Teacher onboarding completed successfully'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Fixed RLS policy for teacher invitations
+DROP POLICY IF EXISTS "Users can view their own pending invitations" ON public.teacher_invitations;
+CREATE POLICY "Users can view their own pending invitations" ON public.teacher_invitations
+    FOR SELECT USING (
+        email = COALESCE(
+            (SELECT email FROM auth.users WHERE id = auth.uid()),
+            (SELECT raw_user_meta_data->>'email' FROM auth.users WHERE id = auth.uid())
+        ) AND status = 'pending'
+    );
+
+-- =============================================
 -- SCHEMA SETUP COMPLETE
 -- =============================================
 

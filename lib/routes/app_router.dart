@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learned_flutter/features/auth/screens/email_verification_screen.dart';
 import 'package:learned_flutter/features/auth/screens/forgot_password_screen.dart';
 import 'package:learned_flutter/features/auth/screens/user_type_selection_screen.dart';
@@ -12,6 +13,7 @@ import 'package:learned_flutter/features/student/screens/student_dashboard_scree
 import 'package:learned_flutter/features/student/screens/classroom_list_screen.dart';
 import 'package:learned_flutter/features/student/screens/classroom_detail_screen.dart';
 import 'package:learned_flutter/features/student/screens/classroom_home_screen.dart';
+import 'package:learned_flutter/features/student/screens/classroom_assignments_screen.dart';
 import 'package:learned_flutter/features/student/screens/student_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/edit_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/my_classes_screen.dart';
@@ -29,6 +31,7 @@ import 'package:learned_flutter/features/student/models/assignment_model.dart';
 import 'package:learned_flutter/features/teacher/screens/teacher_dashboard_screen.dart';
 import 'package:learned_flutter/features/teacher/screens/my_classrooms_screen.dart';
 import 'package:learned_flutter/features/teacher/screens/assignment_management_screen.dart';
+import 'package:learned_flutter/features/teacher/screens/session_management_screen.dart';
 import 'package:learned_flutter/features/debug/screens/database_test_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -68,6 +71,21 @@ final router = GoRouter(
         key: state.pageKey,
         child: ClassroomHomeScreen(classroomId: state.pathParameters['classroomId']!),
       ),
+    ),
+    // Classroom assignments route
+    GoRoute(
+      path: '/classroom-assignments/:classroomId',
+      pageBuilder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final classroomName = extra?['classroomName'] as String? ?? 'Classroom';
+        return MaterialPage(
+          key: state.pageKey,
+          child: ClassroomAssignmentsScreen(
+            classroomId: state.pathParameters['classroomId']!,
+            classroomName: classroomName,
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/splash',
@@ -158,53 +176,6 @@ final router = GoRouter(
                   body: const Center(child: Text('Calendar View - Coming Soon')),
                 ),
               ),
-            ),
-          ],
-        ),
-        // Schedule
-        GoRoute(
-          path: 'schedule',
-          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ScheduleScreen()),
-          routes: [
-            // Join Session
-            GoRoute(
-              path: 'session/join/:sessionId',
-              pageBuilder: (context, state) {
-                final sessionId = state.pathParameters['sessionId']!;
-                final sessionData = state.extra as Map<String, dynamic>?;
-                return MaterialPage(
-                  key: state.pageKey,
-                  child: JoinSessionScreen(sessionId: sessionId, sessionData: sessionData),
-                );
-              },
-              routes: [
-                // Active Session
-                GoRoute(
-                  path: 'active',
-                  pageBuilder: (context, state) {
-                    final sessionId = state.pathParameters['sessionId']!;
-                    final sessionData = state.extra as Map<String, dynamic>?;
-                    return MaterialPage(
-                      key: state.pageKey,
-                      child: ActiveSessionScreen(sessionId: sessionId, sessionData: sessionData),
-                    );
-                  },
-                  routes: [
-                    // Session Feedback
-                    GoRoute(
-                      path: 'feedback',
-                      pageBuilder: (context, state) {
-                        final sessionId = state.pathParameters['sessionId']!;
-                        final sessionData = state.extra as Map<String, dynamic>?;
-                        return MaterialPage(
-                          key: state.pageKey,
-                          child: SessionFeedbackScreen(sessionId: sessionId, sessionData: sessionData),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
             ),
           ],
         ),
@@ -349,6 +320,54 @@ final router = GoRouter(
       ],
     ),
 
+    // Student Schedule (top-level route with drawer, no bottom nav)
+    GoRoute(
+      path: '/student/schedule',
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ScheduleScreen()),
+      routes: [
+        // Join Session
+        GoRoute(
+          path: 'session/join/:sessionId',
+          pageBuilder: (context, state) {
+            final sessionId = state.pathParameters['sessionId']!;
+            final sessionData = state.extra as Map<String, dynamic>?;
+            return MaterialPage(
+              key: state.pageKey,
+              child: JoinSessionScreen(sessionId: sessionId, sessionData: sessionData),
+            );
+          },
+          routes: [
+            // Active Session
+            GoRoute(
+              path: 'active',
+              pageBuilder: (context, state) {
+                final sessionId = state.pathParameters['sessionId']!;
+                final sessionData = state.extra as Map<String, dynamic>?;
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: ActiveSessionScreen(sessionId: sessionId, sessionData: sessionData),
+                );
+              },
+              routes: [
+                // Session Feedback
+                GoRoute(
+                  path: 'feedback',
+                  pageBuilder: (context, state) {
+                    final sessionId = state.pathParameters['sessionId']!;
+                    final sessionData = state.extra as Map<String, dynamic>?;
+                    return MaterialPage(
+                      key: state.pageKey,
+                      child: SessionFeedbackScreen(sessionId: sessionId, sessionData: sessionData),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    ),
+
     // Teacher routes
     GoRoute(
       path: '/teacher',
@@ -363,6 +382,11 @@ final router = GoRouter(
         GoRoute(
           path: 'classrooms',
           pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const MyClassroomsScreen()),
+        ),
+        // Sessions
+        GoRoute(
+          path: 'sessions',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const SessionManagementScreen()),
         ),
         // Assignments
         GoRoute(
@@ -383,8 +407,31 @@ final router = GoRouter(
     // Home route (redirects based on user type)
     GoRoute(
       path: '/home',
-      redirect: (context, state) => '/student',
-    ), // TODO: Check user type and redirect appropriately
+      redirect: (context, state) async {
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user == null) return '/welcome';
+
+        // Check user metadata first
+        final metadataUserType = user.userMetadata?['user_type'];
+        if (metadataUserType == 'teacher') return '/teacher';
+        if (metadataUserType == 'student') return '/student';
+
+        // Fallback: Check database tables
+        try {
+          final teacherResponse = await Supabase.instance.client
+              .from('teachers')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+          if (teacherResponse != null) return '/teacher';
+
+          return '/student'; // Default to student
+        } catch (e) {
+          return '/student'; // Default to student on error
+        }
+      },
+    ),
     // Payment route
     GoRoute(
       path: '/payment',

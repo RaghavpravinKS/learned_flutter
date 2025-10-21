@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../models/assignment_model.dart';
 import '../services/teacher_service.dart';
+import 'assignment_grading_screen.dart';
+import 'create_assignment_screen.dart';
 
 class AssignmentManagementScreen extends ConsumerStatefulWidget {
   const AssignmentManagementScreen({super.key});
@@ -50,9 +52,10 @@ class _AssignmentManagementScreenState extends ConsumerState<AssignmentManagemen
       }
 
       // Load assignments using the existing function
-      final assignmentsResponse = await Supabase.instance.client.rpc('get_teacher_assignments', {
-        'p_teacher_id': teacherId,
-      });
+      final assignmentsResponse = await Supabase.instance.client.rpc(
+        'get_teacher_assignments',
+        params: {'p_teacher_id': teacherId},
+      );
 
       // Load classrooms for filtering
       final classrooms = await _teacherService.getTeacherClassrooms(teacherId);
@@ -421,7 +424,7 @@ class _AssignmentManagementScreenState extends ConsumerState<AssignmentManagemen
         return Icons.quiz_outlined;
       case 'test':
         return Icons.fact_check_outlined;
-      case 'homework':
+      case 'assignment':
         return Icons.assignment_outlined;
       case 'project':
         return Icons.folder_special_outlined;
@@ -448,10 +451,172 @@ class _AssignmentManagementScreenState extends ConsumerState<AssignmentManagemen
   }
 
   void _viewAssignmentDetails(Map<String, dynamic> assignment) {
-    // TODO: Navigate to assignment details screen
-    ScaffoldMessenger.of(
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              // Title
+              Text(assignment['title'], style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              // Classroom name
+              Row(
+                children: [
+                  Icon(Icons.class_outlined, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(assignment['classroom_name'], style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(assignment['status']).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _getStatusColor(assignment['status']).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getAssignmentIcon(assignment['assignment_type']),
+                      size: 16,
+                      color: _getStatusColor(assignment['status']),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      assignment['status'].toString().toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _getStatusColor(assignment['status']),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Details
+              _buildDetailRow(Icons.score, 'Total Points', '${assignment['total_points']} points'),
+              if (assignment['due_date'] != null)
+                _buildDetailRow(Icons.schedule, 'Due Date', _formatDateTime(DateTime.parse(assignment['due_date']))),
+              if (assignment['description'] != null && assignment['description'].toString().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 16),
+                Text('Description', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text(assignment['description'], style: TextStyle(color: Colors.grey[700], height: 1.5)),
+              ],
+              if (assignment['instructions'] != null && assignment['instructions'].toString().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 16),
+                Text('Instructions', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Text(assignment['instructions'], style: TextStyle(color: Colors.grey[700], height: 1.5)),
+              ],
+              const SizedBox(height: 24),
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _editAssignment(assignment);
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _gradeAssignment(assignment);
+                      },
+                      icon: const Icon(Icons.grading),
+                      label: const Text('Grade'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Text(
+            '$label: ',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+          ),
+          Text(value, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        ],
+      ),
+    );
+  }
+
+  void _editAssignment(Map<String, dynamic> assignmentData) {
+    // Convert map to AssignmentModel
+    final assignment = AssignmentModel.fromMap(assignmentData);
+
+    Navigator.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('Assignment details coming soon for: ${assignment['title']}')));
+    ).push(MaterialPageRoute(builder: (context) => CreateAssignmentScreen(assignment: assignment))).then((result) {
+      if (result == true) {
+        _loadData();
+      }
+    });
+  }
+
+  void _gradeAssignment(Map<String, dynamic> assignmentData) {
+    // Convert map to AssignmentModel
+    final assignment = AssignmentModel.fromMap(assignmentData);
+
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => AssignmentGradingScreen(assignment: assignment)));
   }
 
   void _showCreateAssignmentDialog() {
@@ -465,268 +630,12 @@ class _AssignmentManagementScreenState extends ConsumerState<AssignmentManagemen
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => _CreateAssignmentDialog(classrooms: _classrooms, onAssignmentCreated: _loadData),
-    );
-  }
-}
-
-class _CreateAssignmentDialog extends StatefulWidget {
-  final List<Map<String, dynamic>> classrooms;
-  final VoidCallback onAssignmentCreated;
-
-  const _CreateAssignmentDialog({required this.classrooms, required this.onAssignmentCreated});
-
-  @override
-  State<_CreateAssignmentDialog> createState() => _CreateAssignmentDialogState();
-}
-
-class _CreateAssignmentDialogState extends State<_CreateAssignmentDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _instructionsController = TextEditingController();
-  final _totalPointsController = TextEditingController(text: '100');
-
-  String? _selectedClassroomId;
-  String _selectedAssignmentType = 'homework';
-  DateTime? _selectedDueDate;
-  bool _isLoading = false;
-
-  final List<String> _assignmentTypes = ['homework', 'quiz', 'test', 'project'];
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _instructionsController.dispose();
-    _totalPointsController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.assignment_add, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Create Assignment',
-                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            // Form
-            Expanded(
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    // Classroom selection
-                    DropdownButtonFormField<String>(
-                      value: _selectedClassroomId,
-                      decoration: const InputDecoration(labelText: 'Classroom', border: OutlineInputBorder()),
-                      items: widget.classrooms
-                          .map(
-                            (classroom) =>
-                                DropdownMenuItem<String>(value: classroom['id'], child: Text(classroom['name'])),
-                          )
-                          .toList(),
-                      onChanged: (value) => setState(() => _selectedClassroomId = value),
-                      validator: (value) => value == null ? 'Please select a classroom' : null,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Title
-                    TextFormField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'Assignment Title', border: OutlineInputBorder()),
-                      validator: (value) => value?.trim().isEmpty ?? true ? 'Please enter a title' : null,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Assignment type
-                    DropdownButtonFormField<String>(
-                      value: _selectedAssignmentType,
-                      decoration: const InputDecoration(labelText: 'Assignment Type', border: OutlineInputBorder()),
-                      items: _assignmentTypes
-                          .map((type) => DropdownMenuItem<String>(value: type, child: Text(type.toUpperCase())))
-                          .toList(),
-                      onChanged: (value) => setState(() => _selectedAssignmentType = value!),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Total points
-                    TextFormField(
-                      controller: _totalPointsController,
-                      decoration: const InputDecoration(labelText: 'Total Points', border: OutlineInputBorder()),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        final points = int.tryParse(value ?? '');
-                        if (points == null || points <= 0) {
-                          return 'Please enter a valid number of points';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Due date
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.schedule),
-                      title: Text(
-                        _selectedDueDate == null
-                            ? 'Set Due Date'
-                            : 'Due: ${_selectedDueDate!.toLocal().toString().split(' ')[0]}',
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: _selectDueDate,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Description
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Instructions
-                    TextFormField(
-                      controller: _instructionsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Instructions (Optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 3,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Actions
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _createAssignment,
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Create Assignment', style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectDueDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 7)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-
-    if (date != null) {
-      final time = await showTimePicker(context: context, initialTime: const TimeOfDay(hour: 23, minute: 59));
-
-      if (time != null) {
-        setState(() {
-          _selectedDueDate = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-        });
+    // Navigate to Create Assignment Screen
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const CreateAssignmentScreen())).then((result) {
+      // Reload data if assignment was created
+      if (result == true) {
+        _loadData();
       }
-    }
-  }
-
-  Future<void> _createAssignment() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final teacherService = TeacherService();
-      final teacherId = await teacherService.getCurrentTeacherId();
-      if (teacherId == null) throw Exception('Teacher not found');
-
-      // Call the create_assignment function
-      final response = await Supabase.instance.client.rpc('create_assignment', {
-        'p_teacher_id': teacherId,
-        'p_classroom_id': _selectedClassroomId,
-        'p_title': _titleController.text.trim(),
-        'p_description': _descriptionController.text.trim(),
-        'p_due_date': _selectedDueDate?.toIso8601String(),
-        'p_total_points': int.parse(_totalPointsController.text),
-        'p_instructions': _instructionsController.text.trim().isEmpty ? null : _instructionsController.text.trim(),
-        'p_assignment_type': _selectedAssignmentType,
-      });
-
-      if (response['success'] == true) {
-        if (mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Assignment "${_titleController.text}" created successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          widget.onAssignmentCreated();
-        }
-      } else {
-        throw Exception(response['error'] ?? 'Unknown error occurred');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating assignment: ${e.toString()}'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+    });
   }
 }

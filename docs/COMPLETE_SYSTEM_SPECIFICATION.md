@@ -1,6 +1,6 @@
 # 🎓 LearnED Platform - Complete System Architecture & Design Documentation
 
-*Consolidated Technical Specification - October 12, 2025*
+*Consolidated Technical Specification - Last Updated: October 19, 2025*
 
 ---
 
@@ -28,7 +28,7 @@ auth.users (Supabase Auth) → public.users → [students/parents]
    - `students` table (with auto-generated student_id)
    - `parents` table (with auto-generated parent_id)
 
-#### **JWT-Based Teacher Invitation System** 🛡️ *(Updated October 18, 2025)*
+#### **JWT-Based Teacher Invitation System** 🛡️ *(Updated October 19, 2025)*
 ```
 Admin Panel → Create Invitation → Magic Link Email → JWT Authentication → Profile Completion
 ```
@@ -44,7 +44,7 @@ Admin Panel → Create Invitation → Magic Link Email → JWT Authentication �
    - JWT-secured authentication link
    - Professional LearnED branding
    - Clear instructions for setup completion
-   - 1-hour expiration for security
+   - 7-day expiration for security
 
 3. **JWT Authentication**: Teacher clicks link and system validates:
    - Supabase processes JWT from URL hash automatically
@@ -55,7 +55,7 @@ Admin Panel → Create Invitation → Magic Link Email → JWT Authentication �
 4. **Profile Completion**: Teacher completes onboarding via web interface:
    - Bio, phone, additional subjects
    - System creates records in `auth.users`, `public.users`, and `teachers`
-   - Auto-generates teacher_id
+   - Auto-generates teacher_id (TEA + date + UUID)
    - Marks invitation as 'accepted'
 
 5. **Mobile App Access**: Teacher can now login to Flutter app:
@@ -63,12 +63,14 @@ Admin Panel → Create Invitation → Magic Link Email → JWT Authentication �
    - Full access to teacher dashboard and features
    - Seamless transition from web setup to mobile usage
 
-**Security Enhancements:**
+**Security Enhancements & Fixes (October 19, 2025):**
+- **Cross-Platform Email Handling**: Defensive SQL code handles different Supabase auth schema versions
 - **No Direct Password Creation**: Only JWT-validated magic links
-- **Email Verification**: Built-in email confirmation
-- **Invitation Expiration**: Automatic cleanup of expired invitations
+- **Email Verification**: Built-in email confirmation using `raw_user_meta_data`
+- **Invitation Expiration**: Automatic cleanup of expired invitations (7 days)
 - **Admin-Only Creation**: RLS policies prevent unauthorized invitations
 - **Audit Trail**: Complete logging of all invitation activities
+- **Error-Resistant**: Handles both `auth.users.email` and metadata-only configurations
 
 **Tables Involved:**
 - `auth.users` (Supabase managed)
@@ -190,7 +192,156 @@ teachers → teacher_availability → teacher_documents → classrooms
 
 ---
 
-## **👥 Complete User Flows**
+## **� Flutter Mobile App Architecture & UI/UX Improvements** *(Updated October 19, 2025)*
+
+### **Navigation & Authentication System**
+
+#### **Enhanced Splash Screen Logic**
+```dart
+// lib/features/authentication/screens/splash_screen.dart
+```
+**Key Features:**
+- **Smart User Type Detection**: Multi-layered approach using JWT metadata and database fallback
+- **Enhanced Routing**: Fixed teacher dashboard routing issues
+- **Session Validation**: Comprehensive authentication state checking
+- **Error Handling**: Graceful fallback for authentication edge cases
+
+**Recent Fixes:**
+- ✅ **Teacher Routing Issue Resolved**: Teachers now correctly route to teacher dashboard instead of student dashboard
+- ✅ **Database Fallback**: Enhanced `_determineUserType()` method with database table checking
+- ✅ **JWT Metadata Enhancement**: Improved metadata inspection for user type detection
+
+#### **Dashboard UI Improvements**
+
+##### **Teacher Dashboard Enhancements**
+```dart
+// lib/features/teacher/screens/teacher_dashboard_screen.dart
+```
+**UI/UX Improvements:**
+- ✅ **Fixed UI Overflow**: Action cards now properly sized with `childAspectRatio: 1.3`
+- ✅ **Enhanced Drawer Design**: Professional navigation drawer with user info display
+- ✅ **Page Highlighting**: Active page highlighting in navigation drawer
+- ✅ **Better Layout**: Improved grid layout for action cards and statistics
+
+**Key Code Changes:**
+```dart
+// Fixed overflow issue
+GridView.count(
+  childAspectRatio: 1.3, // Changed from 1.5 to prevent overflow
+  children: _buildActionCards(context),
+)
+
+// Enhanced drawer with highlighting
+Widget _buildDrawerItem(String title, IconData icon, String route, bool isSelected) {
+  return Container(
+    margin: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    decoration: BoxDecoration(
+      color: isSelected ? Colors.blue.withOpacity(0.1) : null,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: ListTile(/* drawer item implementation */),
+  );
+}
+```
+
+##### **Student Dashboard Enhancements**
+```dart
+// lib/features/student/screens/student_dashboard_screen.dart
+```
+**UI/UX Improvements:**
+- ✅ **Consistent Navigation**: Matching drawer design with teacher dashboard
+- ✅ **Page Highlighting**: Active page indication in navigation drawer
+- ✅ **Professional Layout**: Improved visual hierarchy and spacing
+
+#### **User Type Fix Helper**
+```dart
+// lib/core/utils/user_type_fix_helper.dart
+```
+**Purpose**: Advanced user type detection and correction system
+**Features:**
+- **Database Verification**: Cross-references user type with actual table records
+- **Metadata Inspection**: Examines JWT metadata for user type information
+- **Automatic Correction**: Updates user type if mismatched
+- **Logging**: Comprehensive debug logging for troubleshooting
+
+### **Authentication Flow Enhancements**
+
+#### **Enhanced JWT Handling**
+**Problem Solved**: Teacher accounts were incorrectly routing to student dashboard
+**Solution**: Multi-step user type verification:
+
+1. **JWT Metadata Check**: Examine `user_metadata` and `raw_user_meta_data`
+2. **Database Table Verification**: Check which role-specific table contains the user
+3. **Automatic Correction**: Update metadata if discrepancy found
+4. **Fallback Logic**: Graceful handling of edge cases
+
+#### **Cross-Platform Compatibility**
+**Issue**: Different Supabase configurations handle email differently
+**Solution**: Defensive SQL coding in teacher invitation system:
+
+```sql
+-- Defensive email retrieval
+SELECT COALESCE(
+    CASE WHEN EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'auth' 
+        AND table_name = 'users' 
+        AND column_name = 'email'
+    ) THEN email ELSE NULL END,
+    raw_user_meta_data->>'email'
+) FROM auth.users WHERE id = current_user_id;
+```
+
+### **UI/UX Design System**
+
+#### **Navigation Drawer Standards**
+- **Consistent Branding**: LearnED logo and user info at top
+- **Visual Hierarchy**: Clear separation of sections
+- **Active State Indication**: Highlighted current page
+- **Professional Styling**: Material Design 3 compliance
+- **Responsive Layout**: Adapts to different screen sizes
+
+#### **Dashboard Layout Standards**
+- **Statistics Cards**: Consistent card design across dashboards
+- **Action Grids**: Standardized grid layout with proper aspect ratios
+- **Color Scheme**: Consistent brand colors and themes
+- **Typography**: Clear hierarchy with proper font sizes
+- **Spacing**: Consistent padding and margins
+
+#### **Error Handling & User Feedback**
+- **Loading States**: Proper loading indicators during authentication
+- **Error Messages**: User-friendly error messages with actionable guidance
+- **Success Feedback**: Clear confirmation of successful actions
+- **Offline Support**: Graceful handling of network issues
+
+### **Recent Bug Fixes & Improvements** *(October 19, 2025)*
+
+#### **Authentication System**
+- ✅ **Fixed Teacher Routing**: Teachers now correctly access teacher dashboard
+- ✅ **Enhanced User Type Detection**: Multi-layer verification system
+- ✅ **Cross-Platform SQL**: Handles different Supabase auth configurations
+- ✅ **JWT Error Handling**: Defensive coding for various JWT scenarios
+
+#### **UI/UX Enhancements**
+- ✅ **Dashboard Overflow Fix**: Proper grid aspect ratios prevent UI overflow
+- ✅ **Navigation Highlighting**: Active page indication in both teacher and student apps
+- ✅ **Professional Drawer Design**: Enhanced navigation drawer with user info
+- ✅ **Consistent Styling**: Unified design system across all screens
+
+#### **Database Compatibility**
+- ✅ **Email Column Handling**: Defensive SQL for different Supabase versions
+- ✅ **Error-Resistant Functions**: Handles missing columns gracefully
+- ✅ **Cross-Platform Support**: Works with various Supabase configurations
+
+#### **Code Quality Improvements**
+- ✅ **Enhanced Error Logging**: Comprehensive debug information
+- ✅ **Defensive Programming**: Robust error handling throughout
+- ✅ **Modular Architecture**: Clean separation of concerns
+- ✅ **Performance Optimization**: Efficient database queries and UI rendering
+
+---
+
+## **�👥 Complete User Flows**
 
 ### **🎓 STUDENT FLOW**
 

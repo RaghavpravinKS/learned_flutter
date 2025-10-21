@@ -58,6 +58,14 @@ class MyClassesScreen extends ConsumerWidget {
           ),
         ), // Close SafeArea
       ), // Close RefreshIndicator
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          context.push('/classrooms');
+        },
+        icon: const Icon(Icons.explore),
+        label: const Text('Browse Classrooms'),
+        backgroundColor: AppColors.primary,
+      ),
     );
   }
 
@@ -116,35 +124,14 @@ class MyClassesScreen extends ConsumerWidget {
 
   List<Widget> _buildClassroomList(BuildContext context, List<Map<String, dynamic>> classrooms) {
     return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0), // Add top padding for status bar
-          child: SafeArea(
-            child: Row(
-              children: [
-                const Icon(Icons.school, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'My Classrooms',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
-                ),
-                const Spacer(),
-                Text(
-                  '${classrooms.length} ${classrooms.length == 1 ? 'classroom' : 'classrooms'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final classroom = classrooms[index];
+            return _buildClassroomCard(context, classroom);
+          }, childCount: classrooms.length),
         ),
-      ),
-      SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          final classroom = classrooms[index];
-          return _buildClassroomCard(context, classroom);
-        }, childCount: classrooms.length),
       ),
     ];
   }
@@ -260,38 +247,44 @@ class MyClassesScreen extends ConsumerWidget {
                 ),
               ],
 
-              const SizedBox(height: 12),
-
-              // Action buttons
-              Row(
-                children: [
-                  if (nextSession != null) ...[
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Navigate to session
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text('Next session: ${_formatDateTime(nextSession)}')));
-                        },
-                        icon: const Icon(Icons.video_call, size: 16),
-                        label: const Text('Next Session'),
-                        style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        context.push('/classrooms/${classroom['id']}');
-                      },
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('View Details'),
-                    ),
+              // Next session info (if available)
+              if (nextSession != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.video_call, size: 18, color: Colors.blue[700]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Next Session',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _formatDateTime(nextSession),
+                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, size: 20, color: Colors.grey[400]),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

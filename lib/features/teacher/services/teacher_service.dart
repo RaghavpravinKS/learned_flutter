@@ -41,28 +41,11 @@ class TeacherService {
 
         classroom['active_enrollments'] = enrollmentResponse.length;
 
-        // Get assignment count
-        final assignmentResponse = await _supabase.from('assignments').select('id').eq('classroom_id', classroomId);
-
-        classroom['assignment_count'] = assignmentResponse.length;
-
-        // Get learning materials count
-        final materialsResponse = await _supabase
-            .from('learning_materials')
-            .select('id')
-            .eq('classroom_id', classroomId);
-
-        classroom['materials_count'] = materialsResponse.length;
-
-        // Get recent session count (last 30 days)
-        final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-        final sessionsResponse = await _supabase
-            .from('class_sessions')
-            .select('id')
-            .eq('classroom_id', classroomId)
-            .gte('session_date', thirtyDaysAgo.toIso8601String().split('T')[0]);
-
-        classroom['recent_sessions'] = sessionsResponse.length;
+        // Set default values for counts that require RLS permissions
+        // These will be loaded separately when viewing classroom details
+        classroom['assignment_count'] = 0;
+        classroom['materials_count'] = 0;
+        classroom['recent_sessions'] = 0;
       }
 
       return classrooms;
@@ -155,10 +138,10 @@ class TeacherService {
       final totalMaterials = materialsResponse.length;
 
       return {
-        'classrooms': totalClassrooms,
-        'students': totalStudents,
-        'assignments': totalAssignments,
-        'materials': totalMaterials,
+        'totalClassrooms': totalClassrooms,
+        'totalStudents': totalStudents,
+        'totalAssignments': totalAssignments,
+        'totalMaterials': totalMaterials,
       };
     } catch (e) {
       print('Error fetching teacher statistics: $e');

@@ -6,71 +6,95 @@ import 'package:learned_flutter/features/student/models/assignment_model.dart';
 import 'package:learned_flutter/features/student/providers/assignment_provider.dart';
 import 'package:learned_flutter/routes/app_routes.dart';
 
-class AssignmentsScreen extends ConsumerWidget {
+class AssignmentsScreen extends ConsumerStatefulWidget {
   const AssignmentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AssignmentsScreen> createState() => _AssignmentsScreenState();
+}
+
+class _AssignmentsScreenState extends ConsumerState<AssignmentsScreen> {
+  bool _isFabExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final assignmentsAsync = ref.watch(upcomingAssignmentsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Assignments'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              // Show filter dialog
-              _showFilterDialog(context, ref);
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () => ref.refresh(upcomingAssignmentsProvider.future),
+          child: assignmentsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  const Text('Failed to load assignments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(
+                    error.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => ref.refresh(upcomingAssignmentsProvider.future),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+            data: (assignments) {
+              if (assignments.isEmpty) {
+                return _buildEmptyState();
+              }
+              return _buildAssignmentsList(assignments, context);
             },
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => ref.refresh(upcomingAssignmentsProvider.future),
-        child: assignmentsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                const SizedBox(height: 16),
-                const Text(
-                  'Failed to load assignments',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  error.toString(),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => ref.refresh(upcomingAssignmentsProvider.future),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-          data: (assignments) {
-            if (assignments.isEmpty) {
-              return _buildEmptyState();
-            }
-            return _buildAssignmentsList(assignments, context);
-          },
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // Navigate to submit assignment screen
-          context.push('/student/assignments/submit');
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Submit Work'),
-      ),
+      floatingActionButton: _buildFloatingActions(context),
+    );
+  }
+
+  Widget _buildFloatingActions(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (_isFabExpanded) ...[
+          FloatingActionButton.extended(
+            heroTag: 'assignmentsFilterFab',
+            onPressed: () {
+              setState(() => _isFabExpanded = false);
+              _showFilterDialog(context, ref);
+            },
+            icon: const Icon(Icons.filter_list),
+            label: const Text('Filter'),
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.primary,
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'assignmentsSubmitFab',
+            onPressed: () {
+              setState(() => _isFabExpanded = false);
+              context.push('/student/assignments/submit');
+            },
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Submit Work'),
+          ),
+          const SizedBox(height: 12),
+        ],
+        FloatingActionButton(
+          heroTag: 'assignmentsMainFab',
+          onPressed: () => setState(() => _isFabExpanded = !_isFabExpanded),
+          child: Icon(_isFabExpanded ? Icons.close : Icons.edit),
+        ),
+      ],
     );
   }
 
@@ -79,19 +103,9 @@ class AssignmentsScreen extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.assignment_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.assignment_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
-          const Text(
-            'No Assignments',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const Text('No Assignments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 48.0),
@@ -108,34 +122,22 @@ class AssignmentsScreen extends ConsumerWidget {
 
   Widget _buildAssignmentsList(List<Assignment> assignments, BuildContext context) {
     // Separate assignments by status
-    final pendingAssignments = assignments
-        .where((a) => a.status == 'pending' || a.status == 'late')
-        .toList()
+    final pendingAssignments = assignments.where((a) => a.status == 'pending' || a.status == 'late').toList()
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
-    final submittedAssignments = assignments
-        .where((a) => a.status == 'submitted' || a.status == 'graded')
-        .toList()
+    final submittedAssignments = assignments.where((a) => a.status == 'submitted' || a.status == 'graded').toList()
       ..sort((a, b) => b.submittedAt!.compareTo(a.submittedAt!));
 
     return CustomScrollView(
       slivers: [
         // Pending Assignments Section
-        if (pendingAssignments.isNotEmpty) ..._buildAssignmentSection(
-          context,
-          'Pending',
-          pendingAssignments,
-          isPending: true,
-        ),
-        
+        if (pendingAssignments.isNotEmpty)
+          ..._buildAssignmentSection(context, 'Pending', pendingAssignments, isPending: true),
+
         // Submitted/Graded Assignments Section
-        if (submittedAssignments.isNotEmpty) ..._buildAssignmentSection(
-          context,
-          'Submitted',
-          submittedAssignments,
-          isPending: false,
-        ),
-        
+        if (submittedAssignments.isNotEmpty)
+          ..._buildAssignmentSection(context, 'Submitted', submittedAssignments, isPending: false),
+
         const SliverToBoxAdapter(child: SizedBox(height: 80)), // Padding for FAB
       ],
     );
@@ -153,21 +155,17 @@ class AssignmentsScreen extends ConsumerWidget {
         sliver: SliverToBoxAdapter(
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[700]),
           ),
         ),
       ),
       SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final assignment = assignments[index];
-            return _buildAssignmentCard(assignment, context, isPending);
-          },
-          childCount: assignments.length,
-        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final assignment = assignments[index];
+          return _buildAssignmentCard(assignment, context, isPending);
+        }, childCount: assignments.length),
       ),
     ];
   }
@@ -182,10 +180,7 @@ class AssignmentsScreen extends ConsumerWidget {
       child: InkWell(
         onTap: () {
           // Navigate to assignment details
-          context.push(
-            '${AppRoutes.studentAssignmentDetails}/${assignment.id}',
-            extra: assignment,
-          );
+          context.push('${AppRoutes.studentAssignmentDetails}/${assignment.id}', extra: assignment);
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -215,10 +210,7 @@ class AssignmentsScreen extends ConsumerWidget {
                       children: [
                         Text(
                           assignment.title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -244,11 +236,7 @@ class AssignmentsScreen extends ConsumerWidget {
                       ),
                       child: Text(
                         '${assignment.grade}%',
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                     ),
                   ] else if (isLate) ...[
@@ -261,11 +249,7 @@ class AssignmentsScreen extends ConsumerWidget {
                       ),
                       child: const Text(
                         'LATE',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                     ),
                   ] else if (isSubmitted) ...[
@@ -278,31 +262,23 @@ class AssignmentsScreen extends ConsumerWidget {
                       ),
                       child: const Text(
                         'SUBMITTED',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 12),
                       ),
                     ),
                   ],
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Assignment Description
               Text(
                 assignment.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                  height: 1.4,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[700], height: 1.4),
               ),
               const SizedBox(height: 12),
-              
+
               // Action Button
               SizedBox(
                 width: double.infinity,
@@ -320,18 +296,16 @@ class AssignmentsScreen extends ConsumerWidget {
                     backgroundColor: isPending ? AppColors.primary : Colors.grey[300],
                     foregroundColor: isPending ? Colors.white : null,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: Text(
                     isPending
                         ? isLate
-                            ? 'Submit Late'
-                            : 'Submit Assignment'
+                              ? 'Submit Late'
+                              : 'Submit Assignment'
                         : isGraded
-                            ? 'View Feedback'
-                            : 'View Details',
+                        ? 'View Feedback'
+                        : 'View Details',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ),
@@ -379,10 +353,7 @@ class AssignmentsScreen extends ConsumerWidget {
   }
 
   String _getMonthName(int month) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
   }
 
@@ -404,12 +375,7 @@ class AssignmentsScreen extends ConsumerWidget {
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ),
     );
   }

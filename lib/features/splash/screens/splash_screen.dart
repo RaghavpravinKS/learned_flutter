@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../features/debug/helpers/user_type_fix_helper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -43,8 +44,15 @@ class _SplashScreenState extends State<SplashScreen> {
     print('🔍 Splash: Session expires at: ${session?.expiresAt}');
 
     if (user != null && session != null) {
-      // User is authenticated, navigate based on user type
-      final userType = user.userMetadata?['user_type'] ?? 'student';
+      // In debug mode, print current user info and try to fix user type
+      if (const bool.fromEnvironment('dart.vm.product') == false) {
+        await UserTypeFixHelper.printCurrentUserInfo();
+        await UserTypeFixHelper.fixCurrentUserType();
+      }
+
+      // User is authenticated, determine user type
+      String userType = await _determineUserType(user);
+
       print('🔍 Splash: User authenticated as $userType, navigating to dashboard');
       setState(() {
         _statusText = 'Welcome back!';
@@ -65,6 +73,50 @@ class _SplashScreenState extends State<SplashScreen> {
       });
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) context.go('/welcome');
+    }
+  }
+
+  Future<String> _determineUserType(User user) async {
+    // First, check user metadata
+    final metadataUserType = user.userMetadata?['user_type'];
+    if (metadataUserType != null) {
+      print('🔍 Splash: Found user_type in metadata: $metadataUserType');
+      return metadataUserType;
+    }
+
+    print('🔍 Splash: No user_type in metadata, checking database...');
+
+    // Fallback: Check database tables to determine user type
+    try {
+      // Check if user exists in teachers table
+      final teacherResponse = await Supabase.instance.client
+          .from('teachers')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (teacherResponse != null) {
+        print('🔍 Splash: Found user in teachers table');
+        return 'teacher';
+      }
+
+      // Check if user exists in students table
+      final studentResponse = await Supabase.instance.client
+          .from('students')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (studentResponse != null) {
+        print('🔍 Splash: Found user in students table');
+        return 'student';
+      }
+
+      print('🔍 Splash: User not found in any specific table, defaulting to student');
+      return 'student';
+    } catch (e) {
+      print('🔍 Splash: Error checking database for user type: $e');
+      return 'student'; // Default to student on error
     }
   }
 

@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:learned_flutter/features/student/models/session_model.dart';
-import 'package:learned_flutter/features/student/providers/session_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../routes/app_routes.dart';
 import '../providers/course_progress_provider.dart';
+import '../providers/session_provider.dart';
 import '../widgets/course_progress_section.dart';
 import 'assignments_screen.dart';
 import 'my_classes_screen.dart';
 import 'student_profile_screen.dart';
+import 'schedule_screen.dart';
+import 'learning_materials_screen.dart';
+import 'progress_screen.dart';
 
 class _PageItem {
   final Widget screen;
@@ -20,6 +23,8 @@ class _PageItem {
 
   _PageItem({required this.screen, required this.title, required this.icon});
 }
+
+enum DrawerSection { dashboard, schedule, materials, profile, settings, help }
 
 class StudentDashboardScreen extends ConsumerStatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -30,6 +35,7 @@ class StudentDashboardScreen extends ConsumerStatefulWidget {
 
 class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen> {
   int _currentIndex = 0;
+  DrawerSection _currentDrawerSection = DrawerSection.dashboard;
   late final PageController _pageController;
   late List<_PageItem> _pages;
 
@@ -45,6 +51,55 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
     super.dispose();
   }
 
+  String _getAppBarTitle() {
+    switch (_currentDrawerSection) {
+      case DrawerSection.dashboard:
+        return _pages[_currentIndex].title;
+      case DrawerSection.schedule:
+        return 'My Schedule';
+      case DrawerSection.materials:
+        return 'Learning Materials';
+      case DrawerSection.profile:
+        return 'Profile';
+      case DrawerSection.settings:
+        return 'Settings';
+      case DrawerSection.help:
+        return 'Help & Support';
+    }
+  }
+
+  Widget _getCurrentBody(String userName) {
+    switch (_currentDrawerSection) {
+      case DrawerSection.dashboard:
+        return PageView.builder(
+          controller: _pageController,
+          itemCount: _pages.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            return _pages[index].screen;
+          },
+        );
+      case DrawerSection.schedule:
+        return const _ScheduleBodyWrapper();
+      case DrawerSection.materials:
+        return const LearningMaterialsScreen();
+      case DrawerSection.profile:
+        return const StudentProfileScreen();
+      case DrawerSection.settings:
+        return const Center(
+          child: Padding(padding: EdgeInsets.all(20.0), child: Text('Settings - Coming Soon')),
+        );
+      case DrawerSection.help:
+        return const Center(
+          child: Padding(padding: EdgeInsets.all(20.0), child: Text('Help & Support - Coming Soon')),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -54,12 +109,12 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
       _PageItem(screen: _buildHomeContent(userName), title: 'Home', icon: Icons.home_outlined),
       _PageItem(screen: const AssignmentsScreen(), title: 'Assignments', icon: Icons.assignment_outlined),
       _PageItem(screen: const MyClassesScreen(), title: 'Classes', icon: Icons.school_outlined),
-      _PageItem(screen: const StudentProfileScreen(), title: 'Profile', icon: Icons.person_outline),
+      _PageItem(screen: const ProgressScreen(), title: 'Progress', icon: Icons.assessment_outlined),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_pages[_currentIndex].title),
+        title: Text(_getAppBarTitle()),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -70,29 +125,125 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           ),
         ],
       ),
-      drawer: _buildDrawer(context, userName),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: _pages.length,
-        onPageChanged: (index) {
+      drawer: _buildDrawer(userName),
+      body: _getCurrentBody(userName),
+      bottomNavigationBar: _currentDrawerSection == DrawerSection.dashboard ? _buildBottomNavigationBar(context) : null,
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
+
+  Widget? _buildFloatingActionButton() {
+    switch (_currentDrawerSection) {
+      case DrawerSection.materials:
+        return FloatingActionButton(
+          onPressed: () {
+            // Navigate to downloaded materials
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Downloaded Materials - Coming Soon')));
+          },
+          tooltip: 'Downloaded Materials',
+          child: const Icon(Icons.download_outlined),
+        );
+      case DrawerSection.schedule:
+        return FloatingActionButton(
+          onPressed: () {
+            // Jump to today
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Jump to Today - Coming Soon')));
+          },
+          tooltip: 'Today',
+          child: const Icon(Icons.today),
+        );
+      default:
+        return null;
+    }
+  }
+
+  Widget _buildDrawer(String userName) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(color: AppColors.primary),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.white,
+                  child: Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  userName,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text('Student', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+              ],
+            ),
+          ),
+          _buildDrawerItem(icon: Icons.dashboard_outlined, title: 'Dashboard', section: DrawerSection.dashboard),
+          _buildDrawerItem(icon: Icons.schedule_outlined, title: 'Schedule', section: DrawerSection.schedule),
+          _buildDrawerItem(
+            icon: Icons.menu_book_outlined,
+            title: 'Learning Materials',
+            section: DrawerSection.materials,
+          ),
+          _buildDrawerItem(icon: Icons.person_outline, title: 'Profile', section: DrawerSection.profile),
+          const Divider(),
+          _buildDrawerItem(icon: Icons.settings_outlined, title: 'Settings', section: DrawerSection.settings),
+          _buildDrawerItem(icon: Icons.help_outline, title: 'Help & Support', section: DrawerSection.help),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Logout'),
+            onTap: () async {
+              Navigator.pop(context);
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) {
+                context.go(AppRoutes.login);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({required IconData icon, required String title, required DrawerSection section}) {
+    final isSelected = _currentDrawerSection == section;
+    return Container(
+      color: isSelected ? AppColors.primary.withOpacity(0.1) : null,
+      child: ListTile(
+        leading: Icon(icon, color: isSelected ? AppColors.primary : null),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? AppColors.primary : null,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+        onTap: () {
+          Navigator.pop(context); // Close drawer
           setState(() {
-            _currentIndex = index;
+            _currentDrawerSection = section;
+            if (section == DrawerSection.dashboard) {
+              _currentIndex = 0; // Reset to home tab
+            }
           });
         },
-        itemBuilder: (context, index) {
-          return _pages[index].screen;
-        },
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(context),
     );
   }
 
   Widget _buildHomeContent(String userName) {
-    final upcomingSessions = ref.watch(upcomingSessionsProvider);
-
     // Refresh data on pull-to-refresh
     Future<void> refreshData() async {
-      await Future.wait([ref.refresh(courseProgressProvider.future), ref.refresh(upcomingSessionsProvider.future)]);
+      return ref.refresh(courseProgressProvider.future);
     }
 
     return RefreshIndicator(
@@ -105,8 +256,6 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
             _buildWelcomeSection(userName),
             const SizedBox(height: 24),
             _buildQuickActions(context),
-            const SizedBox(height: 24),
-            _buildUpcomingSessionsSection(context, upcomingSessions),
             const SizedBox(height: 24),
             // Course progress section using the provider
             const CourseProgressSection(),
@@ -181,92 +330,8 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.calendar_today_rounded,
-                label: 'Schedule',
-                onTap: () => context.go(AppRoutes.studentSchedule),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.school_rounded,
-                label: 'Browse Classrooms',
-                onTap: () => context.push('/classrooms'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.library_books_rounded,
-                label: 'Materials',
-                onTap: () => context.go('/student/materials'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionButton(
-                icon: Icons.quiz_rounded,
-                label: 'Tests',
-                onTap: () => context.go('/student/tests'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+    final upcomingSessionsAsync = ref.watch(upcomingSessionsProvider);
 
-  Widget _buildQuickActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
-                child: Icon(icon, color: AppColors.primary, size: 24),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUpcomingSessionsSection(BuildContext context, AsyncValue<List<SessionModel>> upcomingSessions) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -274,112 +339,190 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Upcoming Sessions',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+              'Upcoming Classes',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
             ),
             TextButton(
-              onPressed: () => context.go(AppRoutes.studentSessions),
-              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-              child: Text('View All', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+              onPressed: () => context.go(AppRoutes.studentSchedule),
+              child: Text(
+                'View All',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: AppColors.primary),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        upcomingSessions.when(
-          data: (sessions) => sessions.isEmpty
-              ? Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
-                  child: Center(
-                    child: Text('No upcoming sessions', style: GoogleFonts.poppins(color: Colors.grey.shade600)),
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: sessions.length > 3 ? 3 : sessions.length,
-                  itemBuilder: (context, index) {
-                    final classItem = sessions[index];
-                    return _buildClassCard(classItem);
-                  },
-                ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Text('Error loading classes: $error', style: const TextStyle(color: Colors.red)),
+        upcomingSessionsAsync.when(
+          data: (sessions) {
+            if (sessions.isEmpty) {
+              return _buildNoUpcomingClasses(context);
+            }
+            // Show only the next 2 upcoming sessions
+            final nextSessions = sessions.take(2).toList();
+            return Column(
+              children: [
+                for (var session in nextSessions) ...[
+                  _buildUpcomingClassCard(session, context),
+                  const SizedBox(height: 12),
+                ],
+              ],
+            );
+          },
+          loading: () => const Center(
+            child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator()),
           ),
+          error: (error, stack) => _buildNoUpcomingClasses(context),
         ),
       ],
     );
   }
 
-  Widget _buildClassCard(SessionModel classItem) {
+  Widget _buildNoUpcomingClasses(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          Icon(Icons.event_available, color: Colors.grey.shade600, size: 32),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('No upcoming classes', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(
+                  'Check your schedule or browse classrooms',
+                  style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUpcomingClassCard(dynamic session, BuildContext context) {
+    final startTime = session.startTime;
+    final endTime = session.endTime;
+    final isLive = session.isLive;
+    final isToday = _isToday(startTime);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.school_rounded, color: AppColors.primary, size: 24),
+      child: InkWell(
+        onTap: () {
+          if (isLive) {
+            context.push('${AppRoutes.studentSessionJoin}/${session.id}');
+          } else {
+            context.push('${AppRoutes.studentSessionDetails}/${session.id}');
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              // Time badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isLive ? Colors.green.shade50 : AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(classItem.subject, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
-                      const SizedBox(height: 4),
+                child: Column(
+                  children: [
+                    Text(
+                      _formatTime(startTime),
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isLive ? Colors.green.shade700 : AppColors.primary,
+                      ),
+                    ),
+                    if (isToday)
                       Text(
-                        'with ${classItem.teacherName}',
-                        style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 13),
+                        'Today',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: isLive ? Colors.green.shade700 : AppColors.primary,
+                        ),
+                      )
+                    else
+                      Text(
+                        _getDayText(startTime),
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: isLive ? Colors.green.shade700 : AppColors.primary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Class details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.subject,
+                      style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'with ${session.teacherName}',
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, size: 12, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_formatTime(startTime)} - ${_formatTime(endTime)}',
+                          style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Join button or status
+              if (isLive)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(20)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.play_arrow, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Join',
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildInfoRow(
-                  Icons.access_time_rounded,
-                  '${_formatTime(classItem.startTime)} - ${_formatTime(classItem.endTime)}',
-                ),
-                const SizedBox(width: 16),
-                _buildInfoRow(Icons.calendar_today_rounded, _getDayText(classItem.startTime)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: classItem.isLive
-                    ? () {
-                        context.push('${AppRoutes.studentSessionJoin}/${classItem.id}');
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: classItem.isLive ? AppColors.primary : Colors.grey[300],
-                  foregroundColor: classItem.isLive ? Colors.white : null,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: Text(classItem.isLive ? 'Join Now' : 'Starts at ${_formatTime(classItem.startTime)}'),
-              ),
-            ),
-          ],
+                )
+              else
+                Icon(Icons.chevron_right, color: Colors.grey.shade400),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
   }
 
   String _formatTime(DateTime time) {
@@ -388,134 +531,16 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
 
   String _getDayText(DateTime date) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-    final dateToCheck = DateTime(date.year, date.month, date.day);
+    final tomorrow = now.add(const Duration(days: 1));
 
-    if (dateToCheck == today) return 'Today';
-    if (dateToCheck == tomorrow) return 'Tomorrow';
+    if (date.year == now.year && date.month == now.month && date.day == now.day) {
+      return 'Today';
+    } else if (date.year == tomorrow.year && date.month == tomorrow.month && date.day == tomorrow.day) {
+      return 'Tomorrow';
+    }
 
-    final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return weekdays[date.weekday - 1];
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
-        const SizedBox(width: 4),
-        Text(text, style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 13)),
-      ],
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context, String userName) {
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Theme.of(context).primaryColor),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white,
-                  child: Text(
-                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  userName,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text('Student', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
-              ],
-            ),
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.dashboard_outlined,
-            title: 'Dashboard',
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.studentDashboard);
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.schedule_outlined,
-            title: 'Schedule',
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.studentSchedule);
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.menu_book_outlined,
-            title: 'Learning Materials',
-            onTap: () {
-              Navigator.pop(context);
-              context.go('${AppRoutes.student}/materials');
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.assessment_outlined,
-            title: 'My Progress',
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.studentProgress);
-            },
-          ),
-          const Divider(),
-          _buildDrawerItem(
-            context,
-            icon: Icons.settings_outlined,
-            title: 'Settings',
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.studentSettings);
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.help_outline,
-            title: 'Help & Support',
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.studentHelp);
-            },
-          ),
-          _buildDrawerItem(
-            context,
-            icon: Icons.logout,
-            title: 'Logout',
-            onTap: () async {
-              Navigator.pop(context);
-              await Supabase.instance.client.auth.signOut();
-              if (context.mounted) {
-                context.go(AppRoutes.login);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(leading: Icon(icon), title: Text(title), onTap: onTap);
   }
 
   Widget _buildBottomNavigationBar(BuildContext context) {
@@ -543,6 +568,51 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
         elevation: 0,
         items: _pages.map((page) => BottomNavigationBarItem(icon: Icon(page.icon), label: page.title)).toList(),
       ),
+    );
+  }
+}
+
+// Wrapper widget to manage Schedule state within Dashboard
+class _ScheduleBodyWrapper extends StatefulWidget {
+  const _ScheduleBodyWrapper();
+
+  @override
+  State<_ScheduleBodyWrapper> createState() => _ScheduleBodyWrapperState();
+}
+
+class _ScheduleBodyWrapperState extends State<_ScheduleBodyWrapper> {
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  CalendarFormat _calendarFormat = CalendarFormat.week;
+
+  @override
+  Widget build(BuildContext context) {
+    return ScheduleBody(
+      focusedDay: _focusedDay,
+      selectedDay: _selectedDay,
+      calendarFormat: _calendarFormat,
+      onDaySelected: (selectedDay, focusedDay) {
+        setState(() {
+          _selectedDay = selectedDay;
+          _focusedDay = focusedDay;
+        });
+      },
+      onFormatChanged: (format) {
+        setState(() {
+          _calendarFormat = format;
+        });
+      },
+      onPageChanged: (focusedDay) {
+        setState(() {
+          _focusedDay = focusedDay;
+        });
+      },
+      onTodayPressed: () {
+        setState(() {
+          _focusedDay = DateTime.now();
+          _selectedDay = _focusedDay;
+        });
+      },
     );
   }
 }
