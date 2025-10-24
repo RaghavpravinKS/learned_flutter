@@ -51,17 +51,73 @@ class _AssignmentManagementScreenState extends ConsumerState<AssignmentManagemen
         throw Exception('Teacher not found');
       }
 
-      // Load assignments using the existing function
-      final assignmentsResponse = await Supabase.instance.client.rpc(
-        'get_teacher_assignments',
-        params: {'p_teacher_id': teacherId},
+      // Load assignments directly from the table
+      final assignmentsResponse = await Supabase.instance.client
+          .from('assignments')
+          .select('''
+            *,
+            classroom:classroom_id (
+              name
+            )
+          ''')
+          .eq('teacher_id', teacherId)
+          .order('created_at', ascending: false);
+
+      // For each assignment, get submission counts
+      final assignments = await Future.wait(
+        (assignmentsResponse as List).map((assignment) async {
+          final assignmentId = assignment['id'];
+
+          // Get total submission count (count unique students who submitted)
+          final submissionsResponse = await Supabase.instance.client
+              .from('student_assignment_attempts')
+              .select('student_id')
+              .eq('assignment_id', assignmentId)
+              .not('submitted_at', 'is', null);
+
+          final uniqueStudents = (submissionsResponse as List).map((s) => s['student_id']).toSet().length;
+
+          // Get graded count (count unique students with graded submissions)
+          final gradedResponse = await Supabase.instance.client
+              .from('student_assignment_attempts')
+              .select('student_id')
+              .eq('assignment_id', assignmentId)
+              .eq('is_graded', true);
+
+          final gradedStudents = (gradedResponse as List).map((s) => s['student_id']).toSet().length;
+
+          final classroom = assignment['classroom'] as Map<String, dynamic>?;
+
+          // Determine status based on publish state and due date
+          String status;
+          if (assignment['is_published'] != true) {
+            status = 'draft';
+          } else {
+            // Check if due date has passed
+            final dueDate = assignment['due_date'] != null ? DateTime.parse(assignment['due_date'] as String) : null;
+
+            if (dueDate != null && dueDate.isBefore(DateTime.now())) {
+              status = 'completed';
+            } else {
+              status = 'active';
+            }
+          }
+
+          return <String, dynamic>{
+            ...assignment,
+            'classroom_name': classroom?['name'] ?? 'Unknown',
+            'status': status,
+            'submission_count': uniqueStudents,
+            'graded_count': gradedStudents,
+          };
+        }).toList(),
       );
 
       // Load classrooms for filtering
       final classrooms = await _teacherService.getTeacherClassrooms(teacherId);
 
       setState(() {
-        _assignments = List<Map<String, dynamic>>.from(assignmentsResponse);
+        _assignments = assignments;
         _classrooms = classrooms;
         _isLoading = false;
       });
@@ -257,8 +313,8 @@ class _AssignmentManagementScreenState extends ConsumerState<AssignmentManagemen
   Widget _buildAssignmentCard(Map<String, dynamic> assignment) {
     final dueDate = assignment['due_date'] != null ? DateTime.parse(assignment['due_date']) : null;
     final isOverdue = dueDate != null && dueDate.isBefore(DateTime.now());
-    final totalSubmissions = assignment['total_submissions'] as int;
-    final gradedSubmissions = assignment['graded_submissions'] as int;
+    final totalSubmissions = (assignment['submission_count'] ?? 0) as int;
+    final gradedSubmissions = (assignment['graded_count'] ?? 0) as int;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),

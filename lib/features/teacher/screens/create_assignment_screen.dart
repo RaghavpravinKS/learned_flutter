@@ -23,16 +23,13 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
   // Form controllers
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _instructionsController;
   late final TextEditingController _totalPointsController;
-  late final TextEditingController _timeLimitController;
 
   // Form state
   String? _selectedClassroomId;
   String _selectedAssignmentType = 'assignment';
   DateTime? _selectedDueDate;
   TimeOfDay? _selectedDueTime;
-  bool _hasTimeLimit = false;
 
   // UI state
   List<Map<String, dynamic>> _classrooms = [];
@@ -54,9 +51,7 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
     // Initialize controllers with existing data if editing
     _titleController = TextEditingController(text: widget.assignment?.title ?? '');
     _descriptionController = TextEditingController(text: widget.assignment?.description ?? '');
-    _instructionsController = TextEditingController(text: widget.assignment?.instructions ?? '');
     _totalPointsController = TextEditingController(text: widget.assignment?.totalPoints.toString() ?? '100');
-    _timeLimitController = TextEditingController(text: widget.assignment?.timeLimitMinutes?.toString() ?? '');
 
     // Set initial state from existing assignment
     if (widget.assignment != null) {
@@ -66,7 +61,6 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
       if (_selectedDueDate != null) {
         _selectedDueTime = TimeOfDay.fromDateTime(_selectedDueDate!);
       }
-      _hasTimeLimit = widget.assignment!.timeLimitMinutes != null;
     }
 
     _loadClassrooms();
@@ -76,9 +70,7 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _instructionsController.dispose();
     _totalPointsController.dispose();
-    _timeLimitController.dispose();
     super.dispose();
   }
 
@@ -152,15 +144,15 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
         'description': _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
         'assignment_type': _selectedAssignmentType,
         'total_points': int.parse(_totalPointsController.text),
-        'time_limit_minutes': _hasTimeLimit && _timeLimitController.text.isNotEmpty
-            ? int.parse(_timeLimitController.text)
-            : null,
         'due_date': finalDueDate?.toIso8601String(),
         'is_published': publish,
-        'instructions': _instructionsController.text.trim().isEmpty ? null : _instructionsController.text.trim(),
-        'status': publish ? 'active' : 'draft',
         'updated_at': DateTime.now().toIso8601String(),
       };
+
+      // Debug: Print the data being sent
+      print('=== Assignment Data ===');
+      print(assignmentData);
+      print('======================');
 
       if (widget.assignment == null) {
         // Create new assignment
@@ -184,6 +176,18 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
         );
       }
     } catch (e) {
+      // Debug: Print detailed error
+      print('=== Error Details ===');
+      print('Error type: ${e.runtimeType}');
+      print('Error message: $e');
+      if (e is PostgrestException) {
+        print('Postgrest code: ${e.code}');
+        print('Postgrest details: ${e.details}');
+        print('Postgrest hint: ${e.hint}');
+        print('Postgrest message: ${e.message}');
+      }
+      print('====================');
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -331,43 +335,6 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Time Limit'),
-                      value: _hasTimeLimit,
-                      onChanged: (value) {
-                        setState(() {
-                          _hasTimeLimit = value;
-                          if (!value) {
-                            _timeLimitController.clear();
-                          }
-                        });
-                      },
-                    ),
-                    if (_hasTimeLimit)
-                      TextFormField(
-                        controller: _timeLimitController,
-                        decoration: InputDecoration(
-                          labelText: 'Minutes',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (value) {
-                          if (_hasTimeLimit && (int.tryParse(value ?? '') ?? 0) <= 0) {
-                            return 'Enter valid minutes';
-                          }
-                          return null;
-                        },
-                      ),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -377,7 +344,7 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
           const SizedBox(height: 24),
 
           // Description
-          _buildSectionTitle('Description & Instructions'),
+          _buildSectionTitle('Description'),
           const SizedBox(height: 12),
 
           TextFormField(
@@ -389,19 +356,6 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             ),
             maxLines: 3,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _instructionsController,
-            decoration: InputDecoration(
-              labelText: 'Instructions (Optional)',
-              hintText: 'Detailed instructions for students',
-              prefixIcon: const Icon(Icons.list_alt),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            maxLines: 5,
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 100), // Space for bottom bar
@@ -448,16 +402,13 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
       items: _classrooms.map((classroom) {
         return DropdownMenuItem<String>(
           value: classroom['id'],
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(classroom['name'], style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text(
-                '${classroom['subject']} - Grade ${classroom['grade_level']}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width - 140, // Increased constraint
+            child: Text(
+              '${classroom['name']} - ${classroom['subject']} (Grade ${classroom['grade_level']})',
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
         );
       }).toList(),

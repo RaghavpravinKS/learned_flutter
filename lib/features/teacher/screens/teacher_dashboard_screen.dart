@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../routes/app_routes.dart';
 import '../services/teacher_service.dart';
 import 'my_classrooms_screen.dart';
 import 'assignment_management_screen.dart';
@@ -30,9 +29,11 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   // State variables for dashboard data
   Map<String, int> _statistics = {};
   List<Map<String, dynamic>> _recentClassrooms = [];
+  List<Map<String, dynamic>> _upcomingSessions = [];
   bool _isLoading = true;
   String? _error;
   String _teacherName = 'Teacher';
+  String? _profileImageUrl;
 
   @override
   void initState() {
@@ -62,7 +63,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       // Load teacher name from database
       final teacherResponse = await Supabase.instance.client
           .from('teachers')
-          .select('*, users!inner(first_name, last_name)')
+          .select('*, users!inner(first_name, last_name, profile_image_url)')
           .eq('id', teacherId)
           .single();
 
@@ -70,14 +71,20 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       final statistics = await _teacherService.getTeacherStatistics(teacherId);
       final recentClassrooms = await _teacherService.getTeacherClassrooms(teacherId);
 
+      // Load upcoming sessions
+      final upcomingSessions = await _loadUpcomingSessions(teacherId);
+
       final firstName = teacherResponse['users']['first_name'] ?? '';
       final lastName = teacherResponse['users']['last_name'] ?? '';
       final fullName = '$firstName $lastName'.trim();
+      final profileImage = teacherResponse['users']['profile_image_url'];
 
       setState(() {
         _teacherName = fullName.isNotEmpty ? fullName : 'Teacher';
+        _profileImageUrl = profileImage;
         _statistics = statistics;
         _recentClassrooms = recentClassrooms.take(3).toList(); // Show only 3 recent classrooms
+        _upcomingSessions = upcomingSessions;
         _isLoading = false;
       });
     } catch (e) {
@@ -86,6 +93,77 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         _error = 'Failed to load teacher data: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadUpcomingSessions(String teacherId) async {
+    try {
+      print('=== LOADING UPCOMING SESSIONS ===');
+      print('Teacher ID: $teacherId');
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      print('Current time: $now');
+      print('Today date: $today');
+
+      // Query sessions from today onwards
+      final response = await Supabase.instance.client
+          .from('class_sessions')
+          .select('''
+            id,
+            title,
+            description,
+            session_date,
+            start_time,
+            end_time,
+            session_type,
+            meeting_url,
+            status,
+            classrooms!inner(
+              id,
+              name,
+              subject,
+              teacher_id
+            )
+          ''')
+          .eq('classrooms.teacher_id', teacherId)
+          .gte('session_date', today.toIso8601String().split('T')[0])
+          .order('session_date', ascending: true)
+          .order('start_time', ascending: true)
+          .limit(10); // Get more and filter in code
+
+      print('Raw response: $response');
+      print('Number of sessions found: ${(response as List).length}');
+
+      // Filter sessions to only include future ones
+      final allSessions = List<Map<String, dynamic>>.from(response);
+      final futureSessions = <Map<String, dynamic>>[];
+
+      for (var session in allSessions) {
+        final sessionDate = DateTime.parse(session['session_date']);
+        final startTime = session['start_time'] as String; // Format: "HH:MM:SS"
+        final timeParts = startTime.split(':');
+        final sessionDateTime = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          int.parse(timeParts[0]),
+          int.parse(timeParts[1]),
+        );
+
+        print('Session: ${session['classrooms']['name']} at $sessionDateTime (${session['title']})');
+
+        if (sessionDateTime.isAfter(now)) {
+          futureSessions.add(session);
+          if (futureSessions.length >= 5) break; // Only need 5
+        }
+      }
+
+      print('Filtered future sessions: ${futureSessions.length}');
+      return futureSessions;
+    } catch (e, stackTrace) {
+      print('Error loading upcoming sessions: $e');
+      print('Stack trace: $stackTrace');
+      return [];
     }
   }
 
@@ -402,14 +480,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           childAspectRatio: 1.3, // Reduced from 1.5 to give more height
           children: [
             _buildActionCard(
-              icon: Icons.class_outlined,
-              title: 'My Classrooms',
-              subtitle: 'Manage your classes',
-              onTap: () {
-                context.push('/teacher/classrooms');
-              },
-            ),
-            _buildActionCard(
               icon: Icons.video_call,
               title: 'Sessions',
               subtitle: 'Schedule & manage',
@@ -493,7 +563,16 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               'Recent Classrooms',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            TextButton(onPressed: () => context.push(AppRoutes.teacherClasses), child: const Text('View All')),
+            TextButton(
+              onPressed: () {
+                // Switch to Classes tab (index 1) in bottom navigation
+                _pageController.jumpToPage(1);
+                setState(() {
+                  _currentIndex = 1;
+                });
+              },
+              child: const Text('View All'),
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -560,50 +639,81 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Upcoming Sessions',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            TextButton(
-              onPressed: () {
-                // TODO: Navigate to full schedule
-              },
-              child: const Text('View All'),
-            ),
-          ],
-        ),
+        Text('Upcoming Sessions', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        // TODO: Replace with actual session data
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                _buildSessionItem(
-                  subject: 'Mathematics',
-                  time: '10:00 AM - 11:00 AM',
-                  students: '15 students',
-                  isLive: false,
+        if (_upcomingSessions.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 12),
+                    Text('No Upcoming Sessions', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                  ],
                 ),
-                const Divider(height: 24),
-                _buildSessionItem(subject: 'Physics', time: '2:00 PM - 3:00 PM', students: '12 students', isLive: true),
-              ],
+              ),
+            ),
+          )
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  for (int i = 0; i < _upcomingSessions.length && i < 3; i++) ...[
+                    if (i > 0) const Divider(height: 24),
+                    _buildSessionItemFromData(_upcomingSessions[i]),
+                  ],
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
 
-  Widget _buildSessionItem({
-    required String subject,
-    required String time,
-    required String students,
-    required bool isLive,
-  }) {
+  Widget _buildSessionItemFromData(Map<String, dynamic> session) {
+    final classroom = session['classrooms'] as Map<String, dynamic>;
+    final subject = classroom['name'] ?? 'Unknown Subject';
+
+    // Parse session_date and start_time/end_time
+    final sessionDate = DateTime.parse(session['session_date'] as String);
+    final startTime = session['start_time'] as String; // Format: "HH:MM:SS"
+    final endTime = session['end_time'] as String;
+
+    final startParts = startTime.split(':');
+    final endParts = endTime.split(':');
+
+    final scheduledStart = DateTime(
+      sessionDate.year,
+      sessionDate.month,
+      sessionDate.day,
+      int.parse(startParts[0]),
+      int.parse(startParts[1]),
+    );
+
+    final scheduledEnd = DateTime(
+      sessionDate.year,
+      sessionDate.month,
+      sessionDate.day,
+      int.parse(endParts[0]),
+      int.parse(endParts[1]),
+    );
+
+    final meetingUrl = session['meeting_url'] as String?;
+
+    // Check if session is happening now (within 15 minutes before start time)
+    final now = DateTime.now();
+    final isLive = now.isAfter(scheduledStart.subtract(const Duration(minutes: 15))) && now.isBefore(scheduledEnd);
+
+    // Format time
+    final timeStr = '${_formatTime(scheduledStart)} - ${_formatTime(scheduledEnd)}';
+
+    // Get enrolled student count (placeholder for now)
+    final students = 'Scheduled';
+
     return Row(
       children: [
         Container(
@@ -625,21 +735,29 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
             children: [
               Text(subject, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
-              Text(time, style: Theme.of(context).textTheme.bodyMedium),
+              Text(timeStr, style: Theme.of(context).textTheme.bodyMedium),
               Text(students, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600])),
             ],
           ),
         ),
-        if (isLive)
+        if (isLive && meetingUrl != null)
           ElevatedButton(
             onPressed: () {
-              // TODO: Start session
+              // TODO: Start session / open meeting URL
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
             child: const Text('Start'),
           ),
       ],
     );
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    return '$hour12:$minute $period';
   }
 
   Widget _buildClassroomsContent() {
@@ -668,10 +786,13 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Text(
-                    teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
+                  backgroundImage: _profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null,
+                  child: _profileImageUrl == null
+                      ? Text(
+                          teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
+                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 8),
                 Text(

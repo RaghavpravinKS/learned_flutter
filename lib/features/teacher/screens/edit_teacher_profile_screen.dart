@@ -33,13 +33,48 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
   void initState() {
     super.initState();
 
+    print('=== EDIT PROFILE INIT ===');
+    print('Teacher Data: ${widget.teacherData}');
+
     final userData = widget.teacherData['users'];
-    _fullNameController = TextEditingController(text: userData['full_name'] ?? '');
-    _phoneController = TextEditingController(text: userData['phone_number'] ?? '');
+    print('User Data: $userData');
+
+    // Combine first_name and last_name for full_name field
+    final firstName = userData['first_name'] ?? '';
+    final lastName = userData['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+
+    print('First Name: $firstName');
+    print('Last Name: $lastName');
+    print('Full Name: $fullName');
+
+    _fullNameController = TextEditingController(text: fullName);
+    _phoneController = TextEditingController(text: userData['phone'] ?? '');
     _bioController = TextEditingController(text: widget.teacherData['bio'] ?? '');
     _qualificationsController = TextEditingController(text: widget.teacherData['qualifications'] ?? '');
-    _specializationController = TextEditingController(text: widget.teacherData['specialization'] ?? '');
-    _experienceController = TextEditingController(text: widget.teacherData['years_of_experience']?.toString() ?? '');
+
+    // Handle specializations - could be an array, convert to string
+    final specializations = widget.teacherData['specializations'];
+    print('Specializations from DB: $specializations (type: ${specializations.runtimeType})');
+    String specializationText = '';
+    if (specializations != null) {
+      if (specializations is List) {
+        specializationText = specializations.join(', ');
+      } else {
+        specializationText = specializations.toString();
+      }
+    }
+    _specializationController = TextEditingController(text: specializationText);
+
+    _experienceController = TextEditingController(text: widget.teacherData['experience_years']?.toString() ?? '');
+
+    print('Phone: ${userData['phone']}');
+    print('Bio: ${widget.teacherData['bio']}');
+    print('Qualifications: ${widget.teacherData['qualifications']}');
+    print('Specialization Text: $specializationText');
+    print('Experience Years: ${widget.teacherData['experience_years']}');
+    print('Profile Image URL: ${userData['profile_image_url']}');
+    print('=========================');
     _currentImageUrl = userData['profile_image_url'];
   }
 
@@ -82,69 +117,159 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
     if (_selectedImage == null) return _currentImageUrl;
 
     try {
+      print('=== UPLOADING PROFILE IMAGE ===');
       final teacherId = widget.teacherData['id'];
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'teachers/$teacherId/profile_$timestamp.jpg';
 
+      print('Teacher ID: $teacherId');
+      print('File name: $fileName');
+
       final bytes = await _selectedImage!.readAsBytes();
-      await Supabase.instance.client.storage
+      print('Image size: ${bytes.length} bytes');
+
+      // Delete old file if exists (to avoid conflicts)
+      if (_currentImageUrl != null && _currentImageUrl!.contains('profile-images')) {
+        try {
+          final oldFileName = _currentImageUrl!.split('/profile-images/').last;
+          print('Attempting to delete old file: $oldFileName');
+          await Supabase.instance.client.storage.from('profile-images').remove([oldFileName]);
+          print('Old file deleted');
+        } catch (e) {
+          print('Could not delete old file (may not exist): $e');
+        }
+      }
+
+      print('Uploading to storage bucket: profile-images');
+      final uploadResponse = await Supabase.instance.client.storage
           .from('profile-images')
           .uploadBinary(fileName, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg'));
 
-      final publicUrl = Supabase.instance.client.storage.from('profile-images').getPublicUrl(fileName);
+      print('Upload response: $uploadResponse');
 
-      return publicUrl;
-    } catch (e) {
-      print('Image upload error: $e');
-      throw Exception('Failed to upload profile image');
+      // Generate a signed URL (valid for 1 year) instead of public URL for better security
+      final signedUrl = await Supabase.instance.client.storage
+          .from('profile-images')
+          .createSignedUrl(fileName, 31536000); // 1 year in seconds
+
+      print('Signed URL: $signedUrl');
+      print('=== IMAGE UPLOAD COMPLETE ===');
+
+      return signedUrl;
+    } catch (e, stackTrace) {
+      print('=== IMAGE UPLOAD ERROR ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      print('==========================');
+      throw Exception('Failed to upload profile image: $e');
     }
   }
 
   Future<void> _saveProfile() async {
+    print('=== SAVE BUTTON PRESSED ===');
+    print('Controller values at save time:');
+    print('  Full Name: "${_fullNameController.text}"');
+    print('  Phone: "${_phoneController.text}"');
+    print('  Bio: "${_bioController.text}"');
+    print('  Qualifications: "${_qualificationsController.text}"');
+    print('  Specialization: "${_specializationController.text}"');
+    print('  Experience: "${_experienceController.text}"');
+    print('===========================');
+
     if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
       return;
     }
 
+    print('=== SAVING PROFILE ===');
     setState(() => _isUploading = true);
 
     try {
       // Upload image if selected
       String? imageUrl = _currentImageUrl;
       if (_selectedImage != null) {
+        print('Uploading new profile image...');
         imageUrl = await _uploadProfileImage();
+        print('Image uploaded: $imageUrl');
       }
 
       final teacherId = widget.teacherData['id'];
       final userId = widget.teacherData['users']['id'];
 
+      print('Teacher ID: $teacherId');
+      print('User ID: $userId');
+
+      // Split full name into first and last name
+      final nameParts = _fullNameController.text.trim().split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      print('Full Name Input: ${_fullNameController.text.trim()}');
+      print('Split into - First: $firstName, Last: $lastName');
+      print('Phone Input: ${_phoneController.text.trim()}');
+
+      // Prepare users update data
+      final usersUpdateData = {
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        'profile_image_url': imageUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      print('Users Update Data: $usersUpdateData');
+
       // Update users table
-      await Supabase.instance.client
+      print('Updating users table...');
+      final usersResponse = await Supabase.instance.client
           .from('users')
-          .update({
-            'full_name': _fullNameController.text.trim(),
-            'phone_number': _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-            'profile_image_url': imageUrl,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', userId);
+          .update(usersUpdateData)
+          .eq('id', userId)
+          .select();
+      print('Users table updated successfully');
+      print('Users update response: $usersResponse');
+
+      // Parse specializations as array
+      List<String>? specializationsList;
+      if (_specializationController.text.trim().isNotEmpty) {
+        specializationsList = _specializationController.text
+            .trim()
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+
+      print('Bio Input: ${_bioController.text.trim()}');
+      print('Qualifications Input: ${_qualificationsController.text.trim()}');
+      print('Specializations Input: ${_specializationController.text.trim()}');
+      print('Specializations List: $specializationsList');
+      print('Experience Input: ${_experienceController.text.trim()}');
+
+      // Prepare teachers update data
+      final teachersUpdateData = {
+        'bio': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+        'qualifications': _qualificationsController.text.trim().isEmpty ? null : _qualificationsController.text.trim(),
+        'specializations': specializationsList,
+        'experience_years': _experienceController.text.trim().isEmpty
+            ? null
+            : int.tryParse(_experienceController.text.trim()),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      print('Teachers Update Data: $teachersUpdateData');
 
       // Update teachers table
-      await Supabase.instance.client
+      print('Updating teachers table...');
+      final teachersResponse = await Supabase.instance.client
           .from('teachers')
-          .update({
-            'bio': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
-            'qualifications': _qualificationsController.text.trim().isEmpty
-                ? null
-                : _qualificationsController.text.trim(),
-            'specialization': _specializationController.text.trim().isEmpty
-                ? null
-                : _specializationController.text.trim(),
-            'years_of_experience': _experienceController.text.trim().isEmpty
-                ? null
-                : int.tryParse(_experienceController.text.trim()),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', teacherId);
+          .update(teachersUpdateData)
+          .eq('id', teacherId)
+          .select();
+      print('Teachers table updated successfully');
+      print('Teachers update response: $teachersResponse');
+
+      print('=== PROFILE SAVE COMPLETE ===');
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -152,7 +277,12 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
         ).showSnackBar(const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green));
         Navigator.pop(context, true);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('=== ERROR SAVING PROFILE ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      print('============================');
+
       if (mounted) {
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(

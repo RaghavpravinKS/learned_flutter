@@ -6,8 +6,9 @@ import 'package:learned_flutter/routes/app_routes.dart';
 class StudentDrawer extends StatelessWidget {
   final String userName;
   final String currentRoute;
+  final String? profileImageUrl;
 
-  const StudentDrawer({super.key, required this.userName, required this.currentRoute});
+  const StudentDrawer({super.key, required this.userName, required this.currentRoute, this.profileImageUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -24,10 +25,15 @@ class StudentDrawer extends StatelessWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Text(
-                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
+                  backgroundImage: profileImageUrl != null && profileImageUrl!.isNotEmpty
+                      ? NetworkImage(profileImageUrl!)
+                      : null,
+                  child: profileImageUrl == null || profileImageUrl!.isEmpty
+                      ? Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 8),
                 Text(

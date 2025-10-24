@@ -193,46 +193,46 @@ class _TeacherProfileContentState extends State<TeacherProfileContent> {
               _buildSectionTitle('Account Settings'),
               _buildSettingItem(icon: Icons.edit_outlined, title: 'Edit Profile', onTap: _navigateToEditProfile),
               _buildSettingItem(icon: Icons.lock_outline, title: 'Change Password', onTap: _navigateToChangePassword),
-              _buildSettingItem(
-                icon: Icons.notifications_none,
-                title: 'Notification Settings',
-                onTap: () {
-                  // TODO: Navigate to notification settings
-                },
-              ),
+              // _buildSettingItem(
+              //   icon: Icons.notifications_none,
+              //   title: 'Notification Settings',
+              //   onTap: () {
+              //     // TODO: Navigate to notification settings
+              //   },
+              // ),
               const SizedBox(height: 16),
 
               // Support
-              _buildSectionTitle('Support'),
-              _buildSettingItem(
-                icon: Icons.help_outline,
-                title: 'Help Center',
-                onTap: () {
-                  // TODO: Navigate to help center
-                },
-              ),
-              _buildSettingItem(
-                icon: Icons.email_outlined,
-                title: 'Contact Support',
-                onTap: () {
-                  // TODO: Navigate to contact support
-                },
-              ),
-              const SizedBox(height: 24),
+              // _buildSectionTitle('Support'),
+              // _buildSettingItem(
+              //   icon: Icons.help_outline,
+              //   title: 'Help Center',
+              //   onTap: () {
+              //     // TODO: Navigate to help center
+              //   },
+              // ),
+              // _buildSettingItem(
+              //   icon: Icons.email_outlined,
+              //   title: 'Contact Support',
+              //   onTap: () {
+              //     // TODO: Navigate to contact support
+              //   },
+              // ),
+              // const SizedBox(height: 24),
 
               // Logout Button
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _handleLogout,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade50,
-                    foregroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  icon: const Icon(Icons.logout, size: 18),
-                  label: const Text('Logout'),
-                ),
-              ),
+              // Center(
+              //   child: ElevatedButton.icon(
+              //     onPressed: _handleLogout,
+              //     style: ElevatedButton.styleFrom(
+              //       backgroundColor: Colors.red.shade50,
+              //       foregroundColor: Colors.red,
+              //       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              //     ),
+              //     icon: const Icon(Icons.logout, size: 18),
+              //     label: const Text('Logout'),
+              //   ),
+              // ),
               const SizedBox(height: 16),
             ],
           ),
@@ -247,34 +247,16 @@ class _TeacherProfileContentState extends State<TeacherProfileContent> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Profile Picture with Edit Button
-        Stack(
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(0.1),
-                image: profileImage != null
-                    ? DecorationImage(image: NetworkImage(profileImage), fit: BoxFit.cover)
-                    : null,
-              ),
-              child: profileImage == null ? const Icon(Icons.person, size: 40, color: AppColors.primary) : null,
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: GestureDetector(
-                onTap: _navigateToEditProfile,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                  child: const Icon(Icons.edit, size: 16, color: Colors.white),
-                ),
-              ),
-            ),
-          ],
+        // Profile Picture
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withOpacity(0.1),
+            image: profileImage != null ? DecorationImage(image: NetworkImage(profileImage), fit: BoxFit.cover) : null,
+          ),
+          child: profileImage == null ? const Icon(Icons.person, size: 40, color: AppColors.primary) : null,
         ),
         const SizedBox(width: 16),
         // Profile Info

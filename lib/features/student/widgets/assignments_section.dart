@@ -20,17 +20,8 @@ class AssignmentsSection extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Upcoming Assignments',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton(
-                onPressed: () => context.go('/student/assignments'),
-                child: const Text('View All'),
-              ),
+              const Text('Upcoming Assignments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              TextButton(onPressed: () => context.go('/student/assignments'), child: const Text('View All')),
             ],
           ),
         ),
@@ -39,9 +30,7 @@ class AssignmentsSection extends ConsumerWidget {
           child: assignmentsAsync.when(
             data: (assignments) {
               if (assignments.isEmpty) {
-                return const Center(
-                  child: Text('No upcoming assignments'),
-                );
+                return const Center(child: Text('No upcoming assignments'));
               }
               return ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -54,9 +43,7 @@ class AssignmentsSection extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(
-              child: Text('Error loading assignments: $error'),
-            ),
+            error: (error, stack) => Center(child: Text('Error loading assignments: $error')),
           ),
         ),
       ],
@@ -64,21 +51,23 @@ class AssignmentsSection extends ConsumerWidget {
   }
 
   Widget _buildAssignmentCard(BuildContext context, Assignment assignment) {
-    final dueDate = DateFormat('MMM d, y').format(assignment.dueDate);
-    final daysLeft = assignment.dueDate.difference(DateTime.now()).inDays;
-    
+    final dueDate = assignment.dueDate != null ? DateFormat('MMM d, y').format(assignment.dueDate!) : 'No due date';
+    final daysLeft = assignment.dueDate?.difference(DateTime.now()).inDays ?? 0;
+
     Color statusColor = Colors.orange;
-    String statusText = 'Due in $daysLeft days';
-    
-    if (daysLeft == 0) {
-      statusText = 'Due today';
-      statusColor = Colors.red;
-    } else if (daysLeft < 0) {
-      statusText = 'Overdue by ${-daysLeft} days';
-      statusColor = Colors.red;
-    } else if (daysLeft == 1) {
-      statusText = 'Due tomorrow';
-      statusColor = Colors.orange;
+    String statusText = assignment.dueDate == null ? 'No deadline' : 'Due in $daysLeft days';
+
+    if (assignment.dueDate != null) {
+      if (daysLeft == 0) {
+        statusText = 'Due today';
+        statusColor = Colors.red;
+      } else if (daysLeft < 0) {
+        statusText = 'Overdue by ${-daysLeft} days';
+        statusColor = Colors.red;
+      } else if (daysLeft == 1) {
+        statusText = 'Due tomorrow';
+        statusColor = Colors.orange;
+      }
     }
 
     if (assignment.status == 'submitted') {
@@ -102,12 +91,7 @@ class AssignmentsSection extends ConsumerWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12.0),
           boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 4, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -115,47 +99,31 @@ class AssignmentsSection extends ConsumerWidget {
           children: [
             Text(
               assignment.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             Text(
-              assignment.description,
+              assignment.description ?? 'No description',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
             const Spacer(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Due: $dueDate',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
+                Text('Due: $dueDate', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8.0,
-                    vertical: 4.0,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12.0),
                   ),
                   child: Text(
                     statusText,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],

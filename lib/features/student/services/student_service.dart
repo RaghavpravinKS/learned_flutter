@@ -40,7 +40,16 @@ class StudentService {
               first_name,
               last_name,
               email,
-              user_type
+              phone,
+              user_type,
+              profile_image_url,
+              date_of_birth,
+              address,
+              city,
+              state,
+              country,
+              postal_code,
+              created_at
             )
           ''')
           .eq('user_id', currentUser.id)

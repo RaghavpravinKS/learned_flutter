@@ -13,6 +13,8 @@ class LearningMaterialModel {
   final DateTime uploadDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? classroomName;
+  final String? teacherName;
 
   LearningMaterialModel({
     this.id,
@@ -29,6 +31,8 @@ class LearningMaterialModel {
     required this.uploadDate,
     this.createdAt,
     this.updatedAt,
+    this.classroomName,
+    this.teacherName,
   });
 
   // Helper getters
@@ -84,6 +88,8 @@ class LearningMaterialModel {
       uploadDate: DateTime.parse(map['upload_date'] as String),
       createdAt: map['created_at'] != null ? DateTime.parse(map['created_at'] as String) : null,
       updatedAt: map['updated_at'] != null ? DateTime.parse(map['updated_at'] as String) : null,
+      classroomName: map['classroom_name'] as String?,
+      teacherName: map['teacher_name'] as String?,
     );
   }
 

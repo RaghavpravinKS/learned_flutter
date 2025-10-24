@@ -8,13 +8,13 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../routes/app_routes.dart';
 import '../providers/course_progress_provider.dart';
 import '../providers/session_provider.dart';
-import '../widgets/course_progress_section.dart';
-import 'assignments_screen.dart';
+import '../providers/student_profile_provider.dart';
+import '../widgets/recent_activity_section.dart';
 import 'my_classes_screen.dart';
 import 'student_profile_screen.dart';
 import 'schedule_screen.dart';
 import 'learning_materials_screen.dart';
-import 'progress_screen.dart';
+import 'all_learning_materials_screen.dart';
 
 class _PageItem {
   final Widget screen;
@@ -57,14 +57,14 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
         return _pages[_currentIndex].title;
       case DrawerSection.schedule:
         return 'My Schedule';
-      case DrawerSection.materials:
-        return 'Learning Materials';
       case DrawerSection.profile:
         return 'Profile';
       case DrawerSection.settings:
         return 'Settings';
       case DrawerSection.help:
         return 'Help & Support';
+      case DrawerSection.materials:
+        return 'Learning Materials';
     }
   }
 
@@ -85,8 +85,6 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
         );
       case DrawerSection.schedule:
         return const _ScheduleBodyWrapper();
-      case DrawerSection.materials:
-        return const LearningMaterialsScreen();
       case DrawerSection.profile:
         return const StudentProfileScreen();
       case DrawerSection.settings:
@@ -97,6 +95,8 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
         return const Center(
           child: Padding(padding: EdgeInsets.all(20.0), child: Text('Help & Support - Coming Soon')),
         );
+      case DrawerSection.materials:
+        return const LearningMaterialsScreen();
     }
   }
 
@@ -105,11 +105,19 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
     final user = Supabase.instance.client.auth.currentUser;
     final userName = user?.userMetadata?['full_name'] ?? 'Student';
 
+    // Watch student profile to get profile image URL
+    final studentProfileAsync = ref.watch(currentStudentProfileProvider);
+    String? profileImageUrl;
+
+    studentProfileAsync.whenData((profile) {
+      if (profile != null && profile['users'] != null) {
+        profileImageUrl = profile['users']['profile_image_url'];
+      }
+    });
+
     _pages = [
       _PageItem(screen: _buildHomeContent(userName), title: 'Home', icon: Icons.home_outlined),
-      _PageItem(screen: const AssignmentsScreen(), title: 'Assignments', icon: Icons.assignment_outlined),
       _PageItem(screen: const MyClassesScreen(), title: 'Classes', icon: Icons.school_outlined),
-      _PageItem(screen: const ProgressScreen(), title: 'Progress', icon: Icons.assessment_outlined),
     ];
 
     return Scaffold(
@@ -125,7 +133,7 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           ),
         ],
       ),
-      drawer: _buildDrawer(userName),
+      drawer: _buildDrawer(userName, profileImageUrl),
       body: _getCurrentBody(userName),
       bottomNavigationBar: _currentDrawerSection == DrawerSection.dashboard ? _buildBottomNavigationBar(context) : null,
       floatingActionButton: _buildFloatingActionButton(),
@@ -134,17 +142,6 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
 
   Widget? _buildFloatingActionButton() {
     switch (_currentDrawerSection) {
-      case DrawerSection.materials:
-        return FloatingActionButton(
-          onPressed: () {
-            // Navigate to downloaded materials
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Downloaded Materials - Coming Soon')));
-          },
-          tooltip: 'Downloaded Materials',
-          child: const Icon(Icons.download_outlined),
-        );
       case DrawerSection.schedule:
         return FloatingActionButton(
           onPressed: () {
@@ -159,7 +156,7 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
     }
   }
 
-  Widget _buildDrawer(String userName) {
+  Widget _buildDrawer(String userName, String? profileImageUrl) {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -173,10 +170,15 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Text(
-                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                    style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
+                  backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
+                      ? NetworkImage(profileImageUrl)
+                      : null,
+                  child: profileImageUrl == null || profileImageUrl.isEmpty
+                      ? Text(
+                          userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                        )
+                      : null,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -189,11 +191,6 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           ),
           _buildDrawerItem(icon: Icons.dashboard_outlined, title: 'Dashboard', section: DrawerSection.dashboard),
           _buildDrawerItem(icon: Icons.schedule_outlined, title: 'Schedule', section: DrawerSection.schedule),
-          _buildDrawerItem(
-            icon: Icons.menu_book_outlined,
-            title: 'Learning Materials',
-            section: DrawerSection.materials,
-          ),
           _buildDrawerItem(icon: Icons.person_outline, title: 'Profile', section: DrawerSection.profile),
           const Divider(),
           _buildDrawerItem(icon: Icons.settings_outlined, title: 'Settings', section: DrawerSection.settings),
@@ -255,10 +252,12 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           children: [
             _buildWelcomeSection(userName),
             const SizedBox(height: 24),
-            _buildQuickActions(context),
+            _buildQuickActionsButtons(context),
             const SizedBox(height: 24),
-            // Course progress section using the provider
-            const CourseProgressSection(),
+            _buildUpcomingClasses(context),
+            const SizedBox(height: 24),
+            // Recent activity section
+            const RecentActivitySection(),
             const SizedBox(height: 24),
           ],
         ),
@@ -329,7 +328,86 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
     }
   }
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActionsButtons(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Actions',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildQuickActionCard(
+                context: context,
+                icon: Icons.assignment_outlined,
+                title: 'Assignments',
+                subtitle: 'View & Submit',
+                color: AppColors.primary,
+                onTap: () => context.push(AppRoutes.studentAssignments),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionCard(
+                context: context,
+                icon: Icons.menu_book_outlined,
+                title: 'Materials',
+                subtitle: 'View & Download',
+                color: AppColors.primary,
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (context) => const AllLearningMaterialsScreen()));
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(height: 12),
+              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpcomingClasses(BuildContext context) {
     final upcomingSessionsAsync = ref.watch(upcomingSessionsProvider);
 
     return Column(
@@ -339,7 +417,7 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Upcoming Classes',
+              'Upcoming Sessions',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
@@ -391,7 +469,7 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('No upcoming classes', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                Text('No upcoming sessions', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
                 const SizedBox(height: 2),
                 Text(
                   'Check your schedule or browse classrooms',

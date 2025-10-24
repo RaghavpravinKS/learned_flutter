@@ -16,9 +16,12 @@ import 'package:learned_flutter/features/student/screens/classroom_home_screen.d
 import 'package:learned_flutter/features/student/screens/classroom_assignments_screen.dart';
 import 'package:learned_flutter/features/student/screens/student_profile_screen.dart';
 import 'package:learned_flutter/features/student/screens/edit_profile_screen.dart';
+import 'package:learned_flutter/features/student/screens/change_password_screen.dart';
+import 'package:learned_flutter/features/student/screens/personal_info_screen.dart';
 import 'package:learned_flutter/features/student/screens/my_classes_screen.dart';
 import 'package:learned_flutter/features/student/screens/session_details_screen.dart';
 import 'package:learned_flutter/features/student/screens/assignments_screen.dart';
+import 'package:learned_flutter/features/student/screens/assignment_detail_screen.dart';
 import 'package:learned_flutter/features/student/screens/schedule_screen.dart';
 import 'package:learned_flutter/features/student/screens/join_session_screen.dart';
 import 'package:learned_flutter/features/student/screens/active_session_screen.dart';
@@ -211,50 +214,31 @@ final router = GoRouter(
           path: 'assignments',
           pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const AssignmentsScreen()),
           routes: [
-            // Assignment submission route
-            GoRoute(
-              path: 'submit',
-              pageBuilder: (context, state) => MaterialPage(
-                key: state.pageKey,
-                child: Scaffold(
-                  appBar: AppBar(title: const Text('Submit Assignment')),
-                  body: const Center(child: Text('Assignment submission form will be implemented here')),
-                ),
-              ),
-            ),
             // Assignment details route
             GoRoute(
               path: ':assignmentId',
               pageBuilder: (context, state) {
+                final assignmentId = state.pathParameters['assignmentId']!;
                 final assignment = state.extra as Assignment?;
                 return MaterialPage(
                   key: state.pageKey,
-                  child: Scaffold(
-                    appBar: AppBar(title: const Text('Assignment Details')),
-                    body: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (assignment != null) ...[
-                            Text(assignment.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 16),
-                            Text('Status: ${assignment.status}'),
-                            const SizedBox(height: 24),
-                            if (state.matchedLocation.endsWith('/submit'))
-                              ElevatedButton(
-                                onPressed: () {
-                                  // Handle submission
-                                },
-                                child: const Text('Submit Assignment'),
-                              ),
-                          ] else
-                            const Text('Assignment not found'),
-                        ],
-                      ),
-                    ),
-                  ),
+                  child: AssignmentDetailScreen(assignmentId: assignmentId, assignment: assignment),
                 );
               },
+              routes: [
+                // Assignment submission sub-route
+                GoRoute(
+                  path: 'submit',
+                  pageBuilder: (context, state) {
+                    final assignmentId = state.pathParameters['assignmentId']!;
+                    final assignment = state.extra as Assignment?;
+                    return MaterialPage(
+                      key: state.pageKey,
+                      child: AssignmentDetailScreen(assignmentId: assignmentId, assignment: assignment),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -268,38 +252,50 @@ final router = GoRouter(
               path: 'edit',
               pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const EditProfileScreen()),
             ),
-            // Session
-            GoRoute(
-              path: 'session/join',
-              pageBuilder: (context, state) => MaterialPage(
-                key: state.pageKey,
-                child: Scaffold(
-                  appBar: AppBar(title: const Text('Join Session')),
-                  body: const Center(child: Text('Join Session - Coming Soon')),
-                ),
-              ),
-            ),
-            GoRoute(
-              path: 'session/active/:sessionId',
-              pageBuilder: (context, state) => MaterialPage(
-                key: state.pageKey,
-                child: Scaffold(
-                  appBar: AppBar(title: const Text('Active Session')),
-                  body: Center(child: Text('Active Session ID: ${state.pathParameters['sessionId']}')),
-                ),
-              ),
-            ),
-            GoRoute(
-              path: 'session/feedback/:sessionId',
-              pageBuilder: (context, state) => MaterialPage(
-                key: state.pageKey,
-                child: Scaffold(
-                  appBar: AppBar(title: const Text('Session Feedback')),
-                  body: Center(child: Text('Feedback for Session ID: ${state.pathParameters['sessionId']}')),
-                ),
-              ),
-            ),
           ],
+        ),
+        // Change Password
+        GoRoute(
+          path: 'change-password',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const StudentChangePasswordScreen()),
+        ),
+        // Personal Information
+        GoRoute(
+          path: 'personal-info',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const PersonalInfoScreen()),
+        ),
+        // Session - Join
+        GoRoute(
+          path: 'session/join',
+          pageBuilder: (context, state) => MaterialPage(
+            key: state.pageKey,
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Join Session')),
+              body: const Center(child: Text('Join Session - Coming Soon')),
+            ),
+          ),
+        ),
+        // Session - Active
+        GoRoute(
+          path: 'session/active/:sessionId',
+          pageBuilder: (context, state) => MaterialPage(
+            key: state.pageKey,
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Active Session')),
+              body: Center(child: Text('Active Session ID: ${state.pathParameters['sessionId']}')),
+            ),
+          ),
+        ),
+        // Session - Feedback
+        GoRoute(
+          path: 'session/feedback/:sessionId',
+          pageBuilder: (context, state) => MaterialPage(
+            key: state.pageKey,
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Session Feedback')),
+              body: Center(child: Text('Feedback for Session ID: ${state.pathParameters['sessionId']}')),
+            ),
+          ),
         ),
         // Notifications
         GoRoute(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:learned_flutter/core/theme/app_colors.dart';
 import 'package:learned_flutter/features/student/models/assignment_model.dart';
 import 'package:learned_flutter/features/student/providers/assignment_provider.dart';
 
@@ -15,7 +16,12 @@ class ClassroomAssignmentsScreen extends ConsumerWidget {
     final assignmentsAsync = ref.watch(classroomAssignmentsProvider(classroomId));
 
     return Scaffold(
-      appBar: AppBar(title: Text('$classroomName - Assignments'), elevation: 0),
+      appBar: AppBar(
+        title: Text('$classroomName - Assignments'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.black,
+        elevation: 0,
+      ),
       body: assignmentsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
@@ -139,8 +145,9 @@ class ClassroomAssignmentsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final now = DateTime.now();
     final dueDate = assignment.dueDate;
-    final isOverdue = dueDate.isBefore(now) && assignment.status != 'submitted' && assignment.status != 'graded';
-    final daysUntilDue = dueDate.difference(now).inDays;
+    final isOverdue =
+        dueDate != null && dueDate.isBefore(now) && assignment.status != 'submitted' && assignment.status != 'graded';
+    final daysUntilDue = dueDate?.difference(now).inDays ?? 0;
 
     Color statusColor;
     IconData statusIcon;
@@ -204,10 +211,10 @@ class ClassroomAssignmentsScreen extends ConsumerWidget {
                   ],
                 ],
               ),
-              if (assignment.description.isNotEmpty) ...[
+              if (assignment.description != null && assignment.description!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  assignment.description,
+                  assignment.description!,
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -271,7 +278,9 @@ class ClassroomAssignmentsScreen extends ConsumerWidget {
     );
   }
 
-  String _formatDueDate(DateTime dueDate) {
+  String _formatDueDate(DateTime? dueDate) {
+    if (dueDate == null) return 'No due date';
+
     final now = DateTime.now();
     final difference = dueDate.difference(now);
 

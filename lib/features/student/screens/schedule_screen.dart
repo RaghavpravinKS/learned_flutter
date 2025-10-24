@@ -14,7 +14,7 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
+  DateTime? _selectedDay = DateTime.now();
   CalendarFormat _calendarFormat = CalendarFormat.week;
 
   @override
@@ -171,11 +171,31 @@ class ScheduleBody extends ConsumerWidget {
             itemCount: sessions.length,
             itemBuilder: (context, index) {
               final session = sessions[index];
-              final startTime = DateTime.parse(session['scheduled_start']).toLocal();
-              final endTime = DateTime.parse(session['scheduled_end']).toLocal();
+
+              // Parse session date and times
+              final sessionDate = session['session_date'] as String?;
+              final startTimeStr = session['start_time'] as String?;
+              final endTimeStr = session['end_time'] as String?;
+
+              if (sessionDate == null || startTimeStr == null || endTimeStr == null) {
+                return const SizedBox.shrink(); // Skip invalid sessions
+              }
+
+              // Combine date and time
+              final startTime = DateTime.parse('$sessionDate $startTimeStr').toLocal();
+              final endTime = DateTime.parse('$sessionDate $endTimeStr').toLocal();
+
               final classroom = session['classrooms'] as Map<String, dynamic>? ?? {};
               final teacher = classroom['teacher'] as Map<String, dynamic>? ?? {};
-              final subject = session['subject'] as Map<String, dynamic>? ?? {};
+              final teacherUser = teacher['users'] as Map<String, dynamic>? ?? {};
+
+              // Get subject from classroom
+              final subject = classroom['subject'] as String? ?? 'No Subject';
+
+              // Get teacher name safely
+              final firstName = teacherUser['first_name'] as String? ?? '';
+              final lastName = teacherUser['last_name'] as String? ?? '';
+              final teacherName = '$firstName $lastName'.trim();
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -185,13 +205,13 @@ class ScheduleBody extends ConsumerWidget {
                     backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
                     child: Icon(Icons.video_call, color: Theme.of(context).primaryColor),
                   ),
-                  title: Text(subject['name'] ?? 'No Subject', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(subject, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
                       Text(
-                        '${teacher['first_name'] ?? ''} ${teacher['last_name'] ?? ''}'.trim(),
+                        teacherName.isNotEmpty ? teacherName : 'No Teacher',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 4),
@@ -224,8 +244,9 @@ class ScheduleBody extends ConsumerWidget {
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
-                    if (session['meeting_url'] != null) {
-                      context.go('/student/schedule/session/join/${session['id']}', extra: session);
+                    final sessionId = session['id'] as String?;
+                    if (session['meeting_url'] != null && sessionId != null) {
+                      context.push('/student/schedule/session/join/$sessionId', extra: session);
                     }
                   },
                 ),

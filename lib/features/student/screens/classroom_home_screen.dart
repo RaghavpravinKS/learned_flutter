@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learned_flutter/features/student/providers/classroom_provider.dart';
 import 'package:learned_flutter/features/student/providers/assignment_provider.dart';
+import 'package:learned_flutter/features/student/providers/learning_materials_provider.dart';
+import 'package:learned_flutter/features/teacher/models/learning_material_model.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
+import 'classroom_materials_screen.dart';
+import 'attendance_sessions_screen.dart';
 
 class ClassroomHomeScreen extends ConsumerWidget {
   final String classroomId;
@@ -130,51 +135,8 @@ class ClassroomHomeScreen extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
-              // Recent Activity
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.history, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Recent Activity',
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildActivityItem(
-                        context,
-                        icon: Icons.check_circle,
-                        title: 'Completed: Introduction to Algebra',
-                        time: '2 hours ago',
-                        color: Colors.green,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildActivityItem(
-                        context,
-                        icon: Icons.assignment_turned_in,
-                        title: 'Submitted: Practice Problems Set 1',
-                        time: '1 day ago',
-                        color: Colors.blue,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildActivityItem(
-                        context,
-                        icon: Icons.star,
-                        title: 'Earned badge: Quick Learner',
-                        time: '3 days ago',
-                        color: Colors.amber,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // Learning Materials
+              _buildLearningMaterialsCard(context, ref),
 
               const SizedBox(height: 80), // Bottom padding
             ]),
@@ -275,80 +237,76 @@ class ClassroomHomeScreen extends ConsumerWidget {
         final title = session['title'] as String;
 
         return Card(
-          elevation: 3,
-          color: AppColors.primary.withOpacity(0.05),
-          child: InkWell(
-            onTap: meetingUrl != null && meetingUrl.isNotEmpty ? () => _launchMeetingUrl(context, meetingUrl) : null,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.video_call, color: AppColors.primary, size: 24),
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Next Session',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 6),
-                      Text(
-                        _formatSessionDate(sessionDate),
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 6),
-                      Text(startTime, style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
-                    ],
-                  ),
-                  if (meetingUrl != null && meetingUrl.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _launchMeetingUrl(context, meetingUrl),
-                            icon: const Icon(Icons.video_camera_front, size: 20),
-                            label: const Text('Join Meeting'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Icon(Icons.video_call, color: AppColors.primary, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Next Session',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 6),
+                    Text(_formatSessionDate(sessionDate), style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                    const SizedBox(width: 16),
+                    Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 6),
+                    Text(startTime, style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                  ],
+                ),
+                if (meetingUrl != null && meetingUrl.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _launchMeetingUrl(context, meetingUrl),
+                      icon: const Icon(Icons.video_camera_front, size: 20),
+                      label: const Text('Join Meeting'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );
@@ -641,40 +599,48 @@ class ClassroomHomeScreen extends ConsumerWidget {
                       Expanded(
                         child: _buildAttendanceStat(
                           context,
+                          ref: ref,
                           icon: Icons.check_circle,
                           label: 'Present',
                           value: attended.toString(),
                           color: Colors.green,
+                          status: 'present',
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildAttendanceStat(
                           context,
+                          ref: ref,
                           icon: Icons.cancel,
                           label: 'Absent',
                           value: absent.toString(),
                           color: Colors.red,
+                          status: 'absent',
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildAttendanceStat(
                           context,
+                          ref: ref,
                           icon: Icons.access_time,
                           label: 'Late',
                           value: late.toString(),
                           color: Colors.orange,
+                          status: 'late',
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildAttendanceStat(
                           context,
+                          ref: ref,
                           icon: Icons.event_available,
                           label: 'Excused',
                           value: excused.toString(),
                           color: Colors.blue,
+                          status: 'excused',
                         ),
                       ),
                     ],
@@ -690,28 +656,48 @@ class ClassroomHomeScreen extends ConsumerWidget {
 
   Widget _buildAttendanceStat(
     BuildContext context, {
+    required WidgetRef ref,
     required IconData icon,
     required String label,
     required String value,
     required Color color,
+    required String status,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+    final classroomAsync = ref.watch(classroomDetailsProvider(classroomId));
+    final classroomName = classroomAsync.value?['name'] ?? 'Classroom';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                AttendanceSessionsScreen(classroomId: classroomId, classroomName: classroomName, status: status),
           ),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3), width: 1),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+            ),
+            Text(
+              label,
+              style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -744,27 +730,318 @@ class ClassroomHomeScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildActivityItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String time,
-    required Color color,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              Text(time, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            ],
-          ),
+  Widget _buildLearningMaterialsCard(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final materialsAsync = ref.watch(recentClassroomMaterialsProvider(classroomId));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.folder_open, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Learning Materials',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    final classroomAsync = ref.read(classroomDetailsProvider(classroomId));
+                    final classroomName = classroomAsync.value?['name'] ?? 'Classroom';
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ClassroomMaterialsScreen(classroomId: classroomId, classroomName: classroomName),
+                      ),
+                    );
+                  },
+                  child: Text('View All', style: TextStyle(color: AppColors.primary)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            materialsAsync.when(
+              loading: () => const Center(
+                child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()),
+              ),
+              error: (error, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Icon(Icons.error_outline, size: 32, color: Colors.grey.shade400),
+                      const SizedBox(height: 8),
+                      Text('Failed to load materials', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+              data: (materials) {
+                if (materials.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          Icon(Icons.folder_open, size: 48, color: Colors.grey.shade300),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No learning materials yet',
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: materials
+                      .map(
+                        (material) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: _buildMaterialItem(context, material: material),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+          ],
         ),
-      ],
+      ),
     );
+  }
+
+  IconData _getMaterialIcon(LearningMaterialModel material) {
+    // Check material type from database
+    switch (material.materialType.toLowerCase()) {
+      case 'document':
+        if (material.isPDF) {
+          return Icons.picture_as_pdf;
+        }
+        return Icons.description;
+      case 'video':
+        return Icons.videocam;
+      case 'presentation':
+        return Icons.slideshow;
+      case 'recording':
+        return Icons.mic;
+      case 'note':
+        return Icons.note;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  Widget _buildMaterialItem(BuildContext context, {required LearningMaterialModel material}) {
+    final daysDiff = DateTime.now().difference(material.uploadDate).inDays;
+    final timeAgo = daysDiff == 0
+        ? 'Today'
+        : daysDiff == 1
+        ? 'Yesterday'
+        : '$daysDiff days ago';
+
+    return InkWell(
+      onTap: () => _viewMaterial(context, material),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(_getMaterialIcon(material), size: 24, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    material.title,
+                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$timeAgo • ${material.fileSizeDisplay}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, size: 20, color: AppColors.primary),
+              onSelected: (value) async {
+                if (value == 'view') {
+                  await _viewMaterial(context, material);
+                } else if (value == 'download') {
+                  await _downloadMaterial(context, material);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'view',
+                  child: Row(children: [Icon(Icons.visibility, size: 20), SizedBox(width: 12), Text('View')]),
+                ),
+                const PopupMenuItem(
+                  value: 'download',
+                  child: Row(children: [Icon(Icons.download, size: 20), SizedBox(width: 12), Text('Download')]),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _viewMaterial(BuildContext context, LearningMaterialModel material) async {
+    if (material.fileUrl == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File URL not available')));
+      }
+      return;
+    }
+
+    try {
+      print('=== Attempting to view material: ${material.title} ===');
+      print('=== Stored File URL: ${material.fileUrl} ===');
+      print('=== Material type: ${material.materialType} ===');
+
+      // Extract the file path from the stored URL
+      // The URL might be in format: https://[project].supabase.co/storage/v1/object/public/learning-materials/[path]
+      // We need to extract the path after 'learning-materials/'
+      String? filePath;
+      final storedUrl = material.fileUrl!;
+
+      if (storedUrl.contains('learning-materials/')) {
+        filePath = storedUrl.split('learning-materials/').last;
+        print('=== Extracted file path: $filePath ===');
+      } else {
+        print('=== Could not extract file path from URL, using stored URL directly ===');
+        filePath = null;
+      }
+
+      Uri uri;
+
+      // If we extracted a file path, create a signed URL for better security and reliability
+      if (filePath != null) {
+        try {
+          final supabase = Supabase.instance.client;
+          // Create a signed URL that expires in 1 hour
+          final signedUrl = await supabase.storage
+              .from('learning-materials')
+              .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+          print('=== Generated signed URL: $signedUrl ===');
+          uri = Uri.parse(signedUrl);
+        } catch (e) {
+          print('=== Error creating signed URL: $e, falling back to stored URL ===');
+          uri = Uri.parse(storedUrl);
+        }
+      } else {
+        uri = Uri.parse(storedUrl);
+      }
+
+      // Use inAppBrowserView mode to open in app (works well for PDFs, images, videos)
+      final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+
+      if (!launched) {
+        print('=== Failed to launch URL in browser view ===');
+        // Try external application as fallback
+        final launchedExternal = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+        if (!launchedExternal && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open file')));
+        }
+      } else {
+        print('=== Successfully opened material in browser view ===');
+      }
+    } catch (e) {
+      print('=== Error viewing material: $e ===');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening file: $e')));
+      }
+    }
+  }
+
+  Future<void> _downloadMaterial(BuildContext context, LearningMaterialModel material) async {
+    if (material.fileUrl == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File URL not available')));
+      }
+      return;
+    }
+
+    try {
+      print('=== Attempting to download material: ${material.title} ===');
+      print('=== Stored File URL: ${material.fileUrl} ===');
+
+      // Extract the file path from the stored URL
+      String? filePath;
+      final storedUrl = material.fileUrl!;
+
+      if (storedUrl.contains('learning-materials/')) {
+        filePath = storedUrl.split('learning-materials/').last;
+        print('=== Extracted file path: $filePath ===');
+      } else {
+        print('=== Could not extract file path from URL, using stored URL directly ===');
+        filePath = null;
+      }
+
+      Uri uri;
+
+      // If we extracted a file path, create a signed URL
+      if (filePath != null) {
+        try {
+          final supabase = Supabase.instance.client;
+          final signedUrl = await supabase.storage.from('learning-materials').createSignedUrl(filePath, 3600);
+
+          print('=== Generated signed URL for download: $signedUrl ===');
+          uri = Uri.parse(signedUrl);
+        } catch (e) {
+          print('=== Error creating signed URL: $e, falling back to stored URL ===');
+          uri = Uri.parse(storedUrl);
+        }
+      } else {
+        uri = Uri.parse(storedUrl);
+      }
+
+      // Open in external application/browser which will trigger download
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (launched) {
+        print('=== Download initiated successfully ===');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Downloading ${material.title}...')));
+        }
+      } else {
+        print('=== Failed to initiate download ===');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not start download')));
+        }
+      }
+    } catch (e) {
+      print('=== Error downloading material: $e ===');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error downloading file: $e')));
+      }
+    }
   }
 }

@@ -7,11 +7,7 @@ class JoinSessionScreen extends ConsumerStatefulWidget {
   final String sessionId;
   final Map<String, dynamic>? sessionData;
 
-  const JoinSessionScreen({
-    super.key,
-    required this.sessionId,
-    this.sessionData,
-  });
+  const JoinSessionScreen({super.key, required this.sessionId, this.sessionData});
 
   @override
   ConsumerState<JoinSessionScreen> createState() => _JoinSessionScreenState();
@@ -33,17 +29,27 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
   }
 
   void _initializeSessionData() {
-    _startTime = DateTime.parse(_sessionData['scheduled_start']).toLocal();
-    _endTime = DateTime.parse(_sessionData['scheduled_end']).toLocal();
+    // Parse session date and times
+    final sessionDate = _sessionData['session_date'] as String?;
+    final startTimeStr = _sessionData['start_time'] as String?;
+    final endTimeStr = _sessionData['end_time'] as String?;
+
+    if (sessionDate != null && startTimeStr != null && endTimeStr != null) {
+      _startTime = DateTime.parse('$sessionDate $startTimeStr').toLocal();
+      _endTime = DateTime.parse('$sessionDate $endTimeStr').toLocal();
+    } else {
+      // Fallback to current time if data is missing
+      _startTime = DateTime.now();
+      _endTime = DateTime.now().add(const Duration(hours: 1));
+    }
   }
 
   Future<void> _checkIfCanJoin() async {
-    final now = DateTime.now().toUtc();
-    final startTime = DateTime.parse(_sessionData['scheduled_start']).toUtc();
-    final joinTime = startTime.subtract(const Duration(minutes: 5));
-    
+    final now = DateTime.now();
+    final joinTime = _startTime.subtract(const Duration(minutes: 5));
+
     setState(() {
-      _canJoin = now.isAfter(joinTime) && now.isBefore(DateTime.parse(_sessionData['scheduled_end']).toUtc());
+      _canJoin = now.isAfter(joinTime) && now.isBefore(_endTime);
     });
   }
 
@@ -57,25 +63,19 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
     try {
       // TODO: Add any pre-session checks or initialization
       await Future.delayed(const Duration(seconds: 1)); // Simulate network call
-      
+
       if (mounted) {
         // Navigate to active session screen
         // Using push instead of go to maintain the navigation stack
         // This allows users to go back to the join screen if needed
         final currentPath = GoRouterState.of(context).matchedLocation;
-        context.push(
-          '$currentPath/active',
-          extra: _sessionData,
-        );
+        context.push('$currentPath/active', extra: _sessionData);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error joining session: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error joining session: $e'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) {
@@ -91,14 +91,25 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
     final theme = Theme.of(context);
     final classroom = _sessionData['classrooms'] as Map<String, dynamic>? ?? {};
     final teacher = classroom['teacher'] as Map<String, dynamic>? ?? {};
-    final subject = _sessionData['subject'] as Map<String, dynamic>? ?? {};
-    
+    final teacherUser = teacher['users'] as Map<String, dynamic>? ?? {};
+
+    // Get subject from classroom
+    final subject = classroom['subject'] as String? ?? 'No Subject';
+
+    // Get teacher name
+    final firstName = teacherUser['first_name'] as String? ?? '';
+    final lastName = teacherUser['last_name'] as String? ?? '';
+    final teacherName = '$firstName $lastName'.trim();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Join Session'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            // Navigate back to schedule screen
+            context.pop();
+          },
         ),
       ),
       body: SingleChildScrollView(
@@ -109,9 +120,7 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
             // Session Card
             Card(
               elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -122,11 +131,7 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                         CircleAvatar(
                           backgroundColor: theme.primaryColor.withOpacity(0.1),
                           radius: 30,
-                          child: Icon(
-                            Icons.school,
-                            size: 32,
-                            color: theme.primaryColor,
-                          ),
+                          child: Icon(Icons.school, size: 32, color: theme.primaryColor),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -134,16 +139,14 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                subject['name'] ?? 'No Subject',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                subject,
+                                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${teacher['first_name'] ?? ''} ${teacher['last_name'] ?? ''}'.trim(),
+                                teacherName.isNotEmpty ? teacherName : 'No Teacher',
                                 style: theme.textTheme.bodyLarge,
                               ),
                             ],
@@ -152,10 +155,7 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    _buildInfoRow(
-                      Icons.access_time,
-                      '${DateFormat('EEEE, MMM d, y').format(_startTime)}',
-                    ),
+                    _buildInfoRow(Icons.access_time, '${DateFormat('EEEE, MMM d, y').format(_startTime)}'),
                     const SizedBox(height: 8),
                     _buildInfoRow(
                       Icons.schedule,
@@ -163,19 +163,15 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                     ),
                     if (_sessionData['meeting_url'] != null) ...[
                       const SizedBox(height: 8),
-                      _buildInfoRow(
-                        Icons.videocam,
-                        'Online Session',
-                        isOnline: true,
-                      ),
+                      _buildInfoRow(Icons.videocam, 'Online Session', isOnline: true),
                     ],
                   ],
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // Join Button
             SizedBox(
               width: double.infinity,
@@ -183,9 +179,7 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                 onPressed: _canJoin && !_isLoading ? _joinSession : null,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _isLoading
                     ? const SizedBox(
@@ -196,93 +190,53 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : Text(
-                        _canJoin ? 'Join Session' : 'Session Not Started',
-                        style: const TextStyle(fontSize: 16),
-                      ),
+                    : Text(_canJoin ? 'Join Session' : 'Session Not Started', style: const TextStyle(fontSize: 16)),
               ),
             ),
-            
+
             if (!_canJoin) ...[
               const SizedBox(height: 16),
               Text(
                 'You can join the session 5 minutes before the scheduled start time.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
                 textAlign: TextAlign.center,
               ),
             ],
-            
+
             const SizedBox(height: 24),
-            
+
             // Session Instructions
-            Text(
-              'Instructions',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Instructions', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildInstructionItem(
-              '1. Make sure you have a stable internet connection.',
-              Icons.wifi,
-            ),
-            _buildInstructionItem(
-              '2. Use headphones for better audio quality.',
-              Icons.headphones,
-            ),
-            _buildInstructionItem(
-              '3. Find a quiet and well-lit place for the session.',
-              Icons.lightbulb_outline,
-            ),
-            _buildInstructionItem(
-              '4. Have your learning materials ready.',
-              Icons.menu_book,
-            ),
+            _buildInstructionItem('1. Make sure you have a stable internet connection.', Icons.wifi),
+            _buildInstructionItem('2. Use headphones for better audio quality.', Icons.headphones),
+            _buildInstructionItem('3. Find a quiet and well-lit place for the session.', Icons.lightbulb_outline),
+            _buildInstructionItem('4. Have your learning materials ready.', Icons.menu_book),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildInfoRow(IconData icon, String text, {bool isOnline = false}) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: isOnline ? Colors.green : null,
-        ),
+        Icon(icon, size: 20, color: isOnline ? Colors.green : null),
         const SizedBox(width: 12),
-        Text(
-          text,
-          style: TextStyle(
-            color: isOnline ? Colors.green : null,
-          ),
-        ),
+        Text(text, style: TextStyle(color: isOnline ? Colors.green : null)),
       ],
     );
   }
-  
+
   Widget _buildInstructionItem(String text, IconData icon) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: Theme.of(context).primaryColor,
-          ),
+          Icon(icon, size: 20, color: Theme.of(context).primaryColor),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 15),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15))),
         ],
       ),
     );

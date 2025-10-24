@@ -68,7 +68,7 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
             )
           ''')
           .eq('classroom_id', widget.session.classroomId)
-          .eq('enrollment_status', 'active');
+          .eq('status', 'active');
 
       setState(() {
         _enrolledStudents = List<Map<String, dynamic>>.from(response as List);

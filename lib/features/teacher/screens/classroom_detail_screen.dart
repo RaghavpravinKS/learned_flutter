@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 import '../../../core/theme/app_colors.dart';
 import '../models/session_model.dart';
@@ -26,8 +28,10 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
   List<Map<String, dynamic>> _students = [];
   List<SessionModel> _upcomingSessions = [];
   List<AssignmentModel> _activeAssignments = [];
+  List<Map<String, dynamic>> _materials = [];
 
   bool _isLoading = true;
+  bool _isUploadingMaterial = false;
   String? _error;
 
   // Statistics
@@ -38,7 +42,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadData();
   }
 
@@ -61,6 +65,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         _loadUpcomingSessions(),
         _loadActiveAssignments(),
         _loadStatistics(),
+        _loadMaterials(),
       ]);
 
       setState(() {
@@ -276,6 +281,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
             Tab(text: 'Overview'),
             Tab(text: 'Students'),
             Tab(text: 'Activity'),
+            Tab(text: 'Materials'),
           ],
         ),
       ),
@@ -318,7 +324,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
 
     return TabBarView(
       controller: _tabController,
-      children: [_buildOverviewTab(), _buildStudentsTab(), _buildActivityTab()],
+      children: [_buildOverviewTab(), _buildStudentsTab(), _buildActivityTab(), _buildMaterialsTab()],
     );
   }
 
@@ -838,6 +844,476 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ),
     );
+  }
+
+  Widget _buildMaterialsTab() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadMaterials();
+      },
+      child: _materials.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.folder_outlined, size: 80, color: Colors.grey[400]),
+                  const SizedBox(height: 24),
+                  Text(
+                    'No Materials Yet',
+                    style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Upload course materials for your students',
+                    style: TextStyle(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: _isUploadingMaterial ? null : _uploadMaterial,
+                    icon: _isUploadingMaterial
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.upload_file),
+                    label: Text(_isUploadingMaterial ? 'Uploading...' : 'Upload Material'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.grey[100],
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_materials.length} Material${_materials.length == 1 ? '' : 's'}',
+                          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _isUploadingMaterial ? null : _uploadMaterial,
+                        icon: _isUploadingMaterial
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.add, size: 20),
+                        label: const Text('Upload'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _materials.length,
+                    itemBuilder: (context, index) => _buildMaterialCard(_materials[index]),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildMaterialCard(Map<String, dynamic> material) {
+    final fileName = material['title'] as String; // Using 'title' instead of 'file_name'
+    final fileSize = _formatFileSize(material['file_size'] as int? ?? 0);
+    final uploadedAt = DateTime.parse(material['created_at'] as String);
+    final isPublic = material['is_public'] as bool? ?? false;
+
+    // Get file extension and icon
+    final extension = fileName.split('.').last.toLowerCase();
+    IconData icon;
+    Color iconColor;
+
+    switch (extension) {
+      case 'pdf':
+        icon = Icons.picture_as_pdf;
+        iconColor = Colors.red;
+        break;
+      case 'doc':
+      case 'docx':
+        icon = Icons.description;
+        iconColor = Colors.blue;
+        break;
+      case 'ppt':
+      case 'pptx':
+        icon = Icons.slideshow;
+        iconColor = Colors.orange;
+        break;
+      case 'xls':
+      case 'xlsx':
+        icon = Icons.table_chart;
+        iconColor = Colors.green;
+        break;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        icon = Icons.image;
+        iconColor = Colors.purple;
+        break;
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+        icon = Icons.video_file;
+        iconColor = Colors.pink;
+        break;
+      default:
+        icon = Icons.insert_drive_file;
+        iconColor = Colors.grey;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: iconColor.withOpacity(0.1),
+          child: Icon(icon, color: iconColor),
+        ),
+        title: Text(
+          fileName,
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text('Size: $fileSize', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            Text(
+              'Uploaded: ${DateFormat('MMM dd, yyyy').format(uploadedAt)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            if (isPublic)
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                child: Text(
+                  'Public',
+                  style: TextStyle(fontSize: 10, color: Colors.green[700], fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
+        ),
+        trailing: PopupMenuButton(
+          icon: const Icon(Icons.more_vert),
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'download', child: Text('Download')),
+            const PopupMenuItem(value: 'delete', child: Text('Delete'), enabled: true),
+          ],
+          onSelected: (value) {
+            if (value == 'download') {
+              _downloadMaterial(material);
+            } else if (value == 'delete') {
+              _confirmDeleteMaterial(material);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadMaterials() async {
+    try {
+      print('=== LOADING MATERIALS ===');
+      print('Classroom ID: ${widget.classroomId}');
+
+      final response = await Supabase.instance.client
+          .from('learning_materials')
+          .select('*')
+          .eq('classroom_id', widget.classroomId)
+          .order('created_at', ascending: false);
+
+      print('Materials query response: $response');
+      print('Response type: ${response.runtimeType}');
+      print('Response length: ${(response as List).length}');
+
+      setState(() {
+        _materials = List<Map<String, dynamic>>.from(response);
+        print('Materials loaded: ${_materials.length} items');
+      });
+    } catch (e, stackTrace) {
+      print('Error loading materials: $e');
+      print('Stack trace: $stackTrace');
+    }
+  }
+
+  Future<void> _uploadMaterial() async {
+    try {
+      print('=== MATERIALS UPLOAD DEBUG START ===');
+
+      // Pick file
+      print('Step 1: Opening file picker...');
+      final result = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: false);
+
+      if (result == null || result.files.isEmpty) {
+        print('File picker cancelled or no file selected');
+        return;
+      }
+
+      final file = result.files.first;
+      print('Step 2: File selected - Name: ${file.name}, Size: ${file.size} bytes');
+      print('File extension: ${file.extension}');
+      print('Has bytes: ${file.bytes != null}, Has path: ${file.path != null}');
+
+      if (file.bytes == null && file.path == null) {
+        throw Exception('No file data available');
+      }
+
+      setState(() => _isUploadingMaterial = true);
+
+      // Get teacher ID
+      print('Step 3: Getting current user...');
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        print('ERROR: User not authenticated');
+        throw Exception('Not authenticated');
+      }
+      print('User ID: ${user.id}');
+      print('User email: ${user.email}');
+
+      print('Step 4: Fetching teacher record...');
+      final teacherResponse = await Supabase.instance.client
+          .from('teachers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+      final teacherId = teacherResponse['id'] as String;
+      print('Teacher ID: $teacherId');
+      print('Classroom ID: ${widget.classroomId}');
+
+      // Verify the teacher owns this classroom (for debugging policy)
+      print('Step 4.5: Verifying teacher owns classroom...');
+      final classroomCheck = await Supabase.instance.client
+          .from('classrooms')
+          .select('id, teacher_id, name')
+          .eq('id', widget.classroomId)
+          .maybeSingle();
+
+      print('Classroom check result: $classroomCheck');
+      if (classroomCheck != null) {
+        print('Classroom exists: ${classroomCheck['name']}');
+        print('Classroom teacher_id: ${classroomCheck['teacher_id']}');
+        print('Current teacher_id: $teacherId');
+        print('Teacher owns classroom: ${classroomCheck['teacher_id'] == teacherId}');
+      } else {
+        print('WARNING: Classroom not found!');
+      }
+
+      // Upload to Supabase Storage
+      final filePath = 'classrooms/${widget.classroomId}/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      print('Step 5: Uploading to storage...');
+      print('Bucket: learning-materials');
+      print('File path: $filePath');
+
+      try {
+        if (file.bytes != null) {
+          print('Uploading using bytes (${file.bytes!.length} bytes)...');
+          await Supabase.instance.client.storage
+              .from('learning-materials')
+              .uploadBinary(filePath, file.bytes!, fileOptions: FileOptions(contentType: file.extension));
+        } else if (file.path != null) {
+          print('Uploading using file path: ${file.path}');
+          await Supabase.instance.client.storage.from('learning-materials').upload(filePath, File(file.path!));
+        }
+        print('Storage upload successful!');
+      } catch (storageError) {
+        print('STORAGE ERROR: $storageError');
+        print('Error type: ${storageError.runtimeType}');
+        if (storageError is StorageException) {
+          print('Storage error message: ${storageError.message}');
+          print('Storage error statusCode: ${storageError.statusCode}');
+        }
+        rethrow;
+      }
+
+      // Get public URL
+      print('Step 6: Getting public URL...');
+      final fileUrl = Supabase.instance.client.storage.from('learning-materials').getPublicUrl(filePath);
+      print('File URL: $fileUrl');
+
+      // Save to database
+      print('Step 7: Saving to database...');
+
+      // Determine material type from file extension
+      String materialType = 'document'; // default
+      final ext = file.extension?.toLowerCase();
+      if (ext != null) {
+        if (['mp4', 'mov', 'avi', 'webm'].contains(ext)) {
+          materialType = 'video';
+        } else if (['jpg', 'jpeg', 'png', 'gif'].contains(ext)) {
+          materialType = 'note'; // or could be 'document'
+        } else if (['ppt', 'pptx'].contains(ext)) {
+          materialType = 'presentation';
+        } else if (['pdf', 'doc', 'docx'].contains(ext)) {
+          materialType = 'document';
+        }
+      }
+
+      final materialData = {
+        'classroom_id': widget.classroomId,
+        'teacher_id': teacherId,
+        'title': file.name,
+        'material_type': materialType,
+        'file_url': fileUrl,
+        'file_size': file.size,
+        'mime_type': file.extension,
+        'is_public': true,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      print('Material data: $materialData');
+
+      await Supabase.instance.client.from('learning_materials').insert(materialData);
+      print('Database insert successful!');
+
+      // Reload materials
+      print('Step 8: Reloading materials list...');
+      await _loadMaterials();
+      print('Materials reloaded - Count: ${_materials.length}');
+
+      print('=== MATERIALS UPLOAD DEBUG END - SUCCESS ===');
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Material uploaded successfully!'), backgroundColor: Colors.green));
+      }
+    } catch (e, stackTrace) {
+      print('=== MATERIALS UPLOAD ERROR ===');
+      print('Error: $e');
+      print('Error type: ${e.runtimeType}');
+      print('Stack trace: $stackTrace');
+
+      if (e is StorageException) {
+        print('StorageException details:');
+        print('  Message: ${e.message}');
+        print('  StatusCode: ${e.statusCode}');
+        print('  Error: ${e.error}');
+      } else if (e is PostgrestException) {
+        print('PostgrestException details:');
+        print('  Message: ${e.message}');
+        print('  Code: ${e.code}');
+        print('  Details: ${e.details}');
+        print('  Hint: ${e.hint}');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading material: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingMaterial = false);
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteMaterial(Map<String, dynamic> material) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Material'),
+        content: Text('Are you sure you want to delete "${material['title']}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteMaterial(material);
+    }
+  }
+
+  Future<void> _deleteMaterial(Map<String, dynamic> material) async {
+    try {
+      // Extract file path from file_url
+      // file_url format: https://{project}.supabase.co/storage/v1/object/public/learning-materials/{path}
+      final fileUrl = material['file_url'] as String?;
+      if (fileUrl != null) {
+        // Extract the path after 'learning-materials/'
+        final uri = Uri.parse(fileUrl);
+        final pathSegments = uri.pathSegments;
+        final bucketIndex = pathSegments.indexOf('learning-materials');
+        if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
+          final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+          print('Deleting file from storage: $filePath');
+          await Supabase.instance.client.storage.from('learning-materials').remove([filePath]);
+        }
+      }
+
+      // Delete from database
+      await Supabase.instance.client.from('learning_materials').delete().eq('id', material['id']);
+
+      // Reload materials
+      await _loadMaterials();
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Material deleted successfully!'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      print('Error deleting material: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting material: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  void _downloadMaterial(Map<String, dynamic> material) {
+    final fileUrl = material['file_url'] as String?;
+    if (fileUrl != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Download link copied to clipboard'),
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
+        ),
+      );
+      // In a real app, you would open the URL or download the file
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   Widget _buildDetailRow(String label, String value) {

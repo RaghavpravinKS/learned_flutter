@@ -13,7 +13,13 @@ final scheduleProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>(
         .from('class_sessions')
         .select('''
           *,
-          classrooms:classroom_id(*, teacher:teacher_id(*))
+          classrooms:classroom_id(
+            *,
+            teacher:teacher_id(
+              *,
+              users:user_id(first_name, last_name)
+            )
+          )
         ''')
         .gte('session_date', DateTime.now().toIso8601String().split('T')[0])
         .order('session_date')

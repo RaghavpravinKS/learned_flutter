@@ -107,9 +107,10 @@ class _MyClassroomsScreenState extends ConsumerState<MyClassroomsScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // TODO: Enhance overview section with better stats and visualizations
           // Header with stats
-          _buildStatsHeader(),
-          const SizedBox(height: 24),
+          // _buildStatsHeader(),
+          // const SizedBox(height: 24),
 
           // Classrooms grid
           Text(
@@ -125,88 +126,89 @@ class _MyClassroomsScreenState extends ConsumerState<MyClassroomsScreen> {
     );
   }
 
-  Widget _buildStatsHeader() {
-    final totalStudents = _classrooms.fold<int>(0, (sum, classroom) => sum + (classroom['active_enrollments'] as int));
-    final totalAssignments = _classrooms.fold<int>(0, (sum, classroom) => sum + (classroom['assignment_count'] as int));
-    final totalMaterials = _classrooms.fold<int>(0, (sum, classroom) => sum + (classroom['materials_count'] as int));
+  // TODO: Enhance overview section with better stats and visualizations
+  // Widget _buildStatsHeader() {
+  //   final totalStudents = _classrooms.fold<int>(0, (sum, classroom) => sum + (classroom['active_enrollments'] as int));
+  //   final totalAssignments = _classrooms.fold<int>(0, (sum, classroom) => sum + (classroom['assignment_count'] as int));
+  //   final totalMaterials = _classrooms.fold<int>(0, (sum, classroom) => sum + (classroom['materials_count'] as int));
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Overview',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.primary),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem(
-                    icon: Icons.class_,
-                    count: _classrooms.length,
-                    label: 'Classrooms',
-                    color: AppColors.primary,
-                  ),
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    icon: Icons.people,
-                    count: totalStudents,
-                    label: 'Students',
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem(
-                    icon: Icons.assignment,
-                    count: totalAssignments,
-                    label: 'Assignments',
-                    color: Colors.orange,
-                  ),
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    icon: Icons.folder,
-                    count: totalMaterials,
-                    label: 'Materials',
-                    color: Colors.blue,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  //   return Card(
+  //     elevation: 2,
+  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(20),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Text(
+  //             'Overview',
+  //             style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.primary),
+  //           ),
+  //           const SizedBox(height: 16),
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: _buildStatItem(
+  //                   icon: Icons.class_,
+  //                   count: _classrooms.length,
+  //                   label: 'Classrooms',
+  //                   color: AppColors.primary,
+  //                 ),
+  //               ),
+  //               Expanded(
+  //                 child: _buildStatItem(
+  //                   icon: Icons.people,
+  //                   count: totalStudents,
+  //                   label: 'Students',
+  //                   color: Colors.green,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //           const SizedBox(height: 16),
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: _buildStatItem(
+  //                   icon: Icons.assignment,
+  //                   count: totalAssignments,
+  //                   label: 'Assignments',
+  //                   color: Colors.orange,
+  //                 ),
+  //               ),
+  //               Expanded(
+  //                 child: _buildStatItem(
+  //                   icon: Icons.folder,
+  //                   count: totalMaterials,
+  //                   label: 'Materials',
+  //                   color: Colors.blue,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
-  Widget _buildStatItem({required IconData icon, required int count, required String label, required Color color}) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          count.toString(),
-          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[800]),
-        ),
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-      ],
-    );
-  }
+  // Widget _buildStatItem({required IconData icon, required int count, required String label, required Color color}) {
+  //   return Column(
+  //     children: [
+  //       Container(
+  //         padding: const EdgeInsets.all(12),
+  //         decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+  //         child: Icon(icon, color: color, size: 24),
+  //       ),
+  //       const SizedBox(height: 8),
+  //       Text(
+  //         count.toString(),
+  //         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+  //       ),
+  //       Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+  //     ],
+  //   );
+  // }
 
   Widget _buildClassroomCard(Map<String, dynamic> classroom) {
     final enrollmentCount = classroom['active_enrollments'] as int;

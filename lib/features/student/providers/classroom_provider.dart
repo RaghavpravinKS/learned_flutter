@@ -13,6 +13,12 @@ final allClassroomsProvider = FutureProvider.autoDispose<List<Map<String, dynami
   return service.getAvailableClassrooms();
 });
 
+// Provider that fetches only enrolled classrooms for the current student
+final enrolledClassroomsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final service = ref.watch(classroomServiceProvider);
+  return service.getEnrolledClassrooms(null);
+});
+
 // Provider to get the next upcoming session for a classroom
 final nextClassroomSessionProvider = FutureProvider.autoDispose.family<Map<String, dynamic>?, String>((
   ref,
@@ -87,6 +93,45 @@ final classroomAttendanceProvider = FutureProvider.autoDispose.family<Map<String
     'attendanceRate': attendanceRate,
   };
 });
+
+// Provider to get sessions filtered by attendance status
+final sessionsByAttendanceStatusProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, ({String classroomId, String status})>((ref, params) async {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Get student record
+      final studentResponse = await supabase.from('students').select('id').eq('user_id', userId).single();
+      final studentId = studentResponse['id'] as String;
+
+      // First, get attendance records with the specific status for this student
+      final attendanceResponse = await supabase
+          .from('session_attendance')
+          .select('session_id')
+          .eq('student_id', studentId)
+          .eq('attendance_status', params.status);
+
+      final sessionIds = (attendanceResponse as List).map((a) => a['session_id'] as String).toList();
+
+      if (sessionIds.isEmpty) {
+        return [];
+      }
+
+      // Then, get the session details for those session IDs
+      final sessionsResponse = await supabase
+          .from('class_sessions')
+          .select('*')
+          .eq('classroom_id', params.classroomId)
+          .inFilter('id', sessionIds)
+          .order('session_date', ascending: false)
+          .order('start_time', ascending: false);
+
+      return (sessionsResponse as List).cast<Map<String, dynamic>>();
+    });
 
 // Check if student is enrolled in a specific classroom
 final studentEnrollmentStatusProvider = FutureProvider.autoDispose.family<bool, String>((ref, classroomId) async {

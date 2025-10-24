@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../models/assignment_model.dart';
@@ -69,7 +70,8 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
               id,
               user_id,
               users!inner (
-                full_name,
+                first_name,
+                last_name,
                 email
               )
             )
@@ -82,9 +84,13 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
         final student = item['student'] as Map<String, dynamic>?;
         final user = student?['users'] as Map<String, dynamic>?;
 
+        final firstName = user?['first_name'] ?? '';
+        final lastName = user?['last_name'] ?? '';
+        final fullName = (firstName + ' ' + lastName).trim();
+
         return SubmissionModel.fromMap({
           ...item,
-          'student_name': user?['full_name'] ?? 'Unknown',
+          'student_name': fullName.isNotEmpty ? fullName : 'Unknown',
           'student_email': user?['email'],
         });
       }).toList();
@@ -108,13 +114,14 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
               id,
               user_id,
               users!inner (
-                full_name,
+                first_name,
+                last_name,
                 email
               )
             )
           ''')
           .eq('classroom_id', widget.assignment.classroomId)
-          .eq('enrollment_status', 'active');
+          .eq('status', 'active');
 
       setState(() {
         _enrolledStudents = List<Map<String, dynamic>>.from(response as List);
@@ -126,11 +133,33 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
   }
 
   List<SubmissionModel> get _pendingSubmissions {
-    return _submissions.where((s) => s.isSubmitted && !s.isGraded).toList();
+    // Group by student_id and get the latest submission for each student
+    final Map<String, SubmissionModel> latestByStudent = {};
+
+    for (var submission in _submissions.where((s) => s.isSubmitted && !s.isGraded)) {
+      final studentId = submission.studentId;
+      if (!latestByStudent.containsKey(studentId) ||
+          submission.submittedAt!.isAfter(latestByStudent[studentId]!.submittedAt!)) {
+        latestByStudent[studentId] = submission;
+      }
+    }
+
+    return latestByStudent.values.toList();
   }
 
   List<SubmissionModel> get _gradedSubmissions {
-    return _submissions.where((s) => s.isGraded).toList();
+    // Group by student_id and get the latest submission for each student
+    final Map<String, SubmissionModel> latestByStudent = {};
+
+    for (var submission in _submissions.where((s) => s.isGraded)) {
+      final studentId = submission.studentId;
+      if (!latestByStudent.containsKey(studentId) ||
+          submission.submittedAt!.isAfter(latestByStudent[studentId]!.submittedAt!)) {
+        latestByStudent[studentId] = submission;
+      }
+    }
+
+    return latestByStudent.values.toList();
   }
 
   List<Map<String, dynamic>> get _notSubmittedStudents {
@@ -412,7 +441,10 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
         final studentData = _notSubmittedStudents[index];
         final student = studentData['student'] as Map<String, dynamic>;
         final user = student['users'] as Map<String, dynamic>;
-        final name = user['full_name'] as String;
+
+        final firstName = user['first_name'] ?? '';
+        final lastName = user['last_name'] ?? '';
+        final name = (firstName + ' ' + lastName).trim();
         final email = user['email'] as String;
 
         return Card(
@@ -448,26 +480,34 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
     return Colors.red;
   }
 
-  void _showGradingDialog(SubmissionModel submission) {
-    showDialog(
-      context: context,
-      builder: (context) => _GradingDialog(submission: submission, assignment: widget.assignment, onGraded: _loadData),
+  void _showGradingDialog(SubmissionModel submission) async {
+    // Get all submissions for this student
+    final allStudentSubmissions = _submissions.where((s) => s.studentId == submission.studentId).toList()
+      ..sort((a, b) => (b.submittedAt ?? DateTime(2000)).compareTo(a.submittedAt ?? DateTime(2000)));
+
+    // Navigate to full screen grading page
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _GradingScreen(allSubmissions: allStudentSubmissions, assignment: widget.assignment),
+      ),
     );
+
+    // Reload data after grading
+    _loadData();
   }
 }
 
-class _GradingDialog extends StatefulWidget {
-  final SubmissionModel submission;
+class _GradingScreen extends StatefulWidget {
+  final List<SubmissionModel> allSubmissions;
   final AssignmentModel assignment;
-  final VoidCallback onGraded;
 
-  const _GradingDialog({required this.submission, required this.assignment, required this.onGraded});
+  const _GradingScreen({required this.allSubmissions, required this.assignment});
 
   @override
-  State<_GradingDialog> createState() => _GradingDialogState();
+  State<_GradingScreen> createState() => _GradingScreenState();
 }
 
-class _GradingDialogState extends State<_GradingDialog> {
+class _GradingScreenState extends State<_GradingScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _scoreController;
   late final TextEditingController _feedbackController;
@@ -476,8 +516,16 @@ class _GradingDialogState extends State<_GradingDialog> {
   @override
   void initState() {
     super.initState();
-    _scoreController = TextEditingController(text: widget.submission.score?.toStringAsFixed(1) ?? '');
-    _feedbackController = TextEditingController(text: widget.submission.feedback ?? '');
+    _scoreController = TextEditingController();
+    _feedbackController = TextEditingController();
+
+    // Pre-fill with existing grade if any attempt is already graded
+    final gradedAttempt = widget.allSubmissions.firstWhere(
+      (s) => s.isGraded,
+      orElse: () => widget.allSubmissions.first,
+    );
+    _scoreController.text = gradedAttempt.score?.toStringAsFixed(1) ?? '';
+    _feedbackController.text = gradedAttempt.feedback ?? '';
   }
 
   @override
@@ -485,6 +533,112 @@ class _GradingDialogState extends State<_GradingDialog> {
     _scoreController.dispose();
     _feedbackController.dispose();
     super.dispose();
+  }
+
+  String? _getFileUrl(SubmissionModel submission) {
+    final answers = submission.answers;
+    if (answers != null) {
+      return answers['file_url'] as String?;
+    }
+    return null;
+  }
+
+  String? _getFilePath(SubmissionModel submission) {
+    final answers = submission.answers;
+    if (answers != null) {
+      return answers['file_path'] as String?;
+    }
+    return null;
+  }
+
+  String? _getFileName(SubmissionModel submission) {
+    final answers = submission.answers;
+    if (answers != null) {
+      final fileName = answers['file_name'] as String?;
+      if (fileName != null) return fileName;
+    }
+    final fileUrl = _getFileUrl(submission);
+    if (fileUrl != null) {
+      return fileUrl.split('/').last;
+    }
+    final filePath = _getFilePath(submission);
+    if (filePath != null) {
+      return filePath.split('/').last;
+    }
+    return null;
+  }
+
+  Future<void> _openFile(SubmissionModel submission) async {
+    try {
+      setState(() => _isLoading = true);
+
+      // Get the storage path directly from answers
+      final storagePath = _getFilePath(submission);
+
+      if (storagePath == null || storagePath.isEmpty) {
+        // Fallback: try to extract from file_url if it exists (for old submissions)
+        final fileUrl = _getFileUrl(submission);
+        if (fileUrl != null && fileUrl.contains('assignment-attachments/')) {
+          final extractedPath = fileUrl.split('assignment-attachments/').last;
+          final decodedPath = Uri.decodeComponent(extractedPath);
+          print('DEBUG: Extracted storage path from URL: $decodedPath');
+
+          await _openFileWithPath(decodedPath);
+          return;
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('No file path found'), backgroundColor: Colors.orange));
+        }
+        return;
+      }
+
+      print('DEBUG: Storage path from answers: $storagePath');
+      await _openFileWithPath(storagePath);
+    } catch (e) {
+      print('DEBUG: Error opening file: $e');
+      if (mounted) {
+        String errorMessage = 'Error opening file: $e';
+
+        // Provide helpful message for missing files
+        if (e.toString().contains('Object not found') || e.toString().contains('404')) {
+          errorMessage =
+              'File not found in storage. This may be an old submission before the storage system was properly configured. Please ask the student to resubmit.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _openFileWithPath(String storagePath) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      print('DEBUG: Creating signed URL for: $storagePath');
+
+      // Generate signed URL from Supabase storage
+      final signedUrl = await supabase.storage
+          .from('assignment-attachments')
+          .createSignedUrl(storagePath, 3600); // Valid for 1 hour
+
+      print('DEBUG: Generated signed URL: $signedUrl');
+
+      // Launch the signed URL directly (canLaunchUrl returns false for storage URLs on Android)
+      final uri = Uri.parse(signedUrl);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      print('DEBUG: Error opening file: $e');
+      rethrow;
+    }
   }
 
   Future<void> _saveGrade() async {
@@ -496,30 +650,41 @@ class _GradingDialogState extends State<_GradingDialog> {
       final score = double.parse(_scoreController.text);
       final maxScore = widget.assignment.totalPoints.toDouble();
       final percentage = (score / maxScore) * 100;
+      final feedback = _feedbackController.text.trim();
 
       final teacherService = TeacherService();
       final teacherId = await teacherService.getCurrentTeacherId();
 
-      await Supabase.instance.client
+      final supabase = Supabase.instance.client;
+
+      final studentId = widget.allSubmissions.first.studentId;
+      final studentName = widget.allSubmissions.first.studentName;
+
+      // Update ALL attempts for this student/assignment with the same grade
+      // This ensures the student has ONE consistent grade across all attempts
+      await supabase
           .from('student_assignment_attempts')
           .update({
             'score': score,
             'max_score': maxScore,
             'percentage': percentage,
-            'feedback': _feedbackController.text.trim().isEmpty ? null : _feedbackController.text.trim(),
+            'feedback': feedback,
             'is_graded': true,
             'graded_by': teacherId,
             'graded_at': DateTime.now().toIso8601String(),
             'updated_at': DateTime.now().toIso8601String(),
           })
-          .eq('id', widget.submission.id!);
+          .eq('student_id', studentId)
+          .eq('assignment_id', widget.assignment.id!);
 
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Grade saved for ${widget.submission.studentName}'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('Grade saved for $studentName (${widget.allSubmissions.length} attempt(s) updated)'),
+            backgroundColor: Colors.green,
+          ),
         );
-        widget.onGraded();
       }
     } catch (e) {
       if (mounted) {
@@ -536,53 +701,31 @@ class _GradingDialogState extends State<_GradingDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    final studentName = widget.allSubmissions.first.studentName;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Container(
+            Text('Grade Assignment', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(studentName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal)),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.grading, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Grade Submission',
-                          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
-                        ),
-                        Text(
-                          widget.submission.studentName,
-                          style: const TextStyle(fontSize: 14, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            // Content
-            Expanded(
               child: Form(
                 key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Assignment info
                     Container(
@@ -600,16 +743,89 @@ class _GradingDialogState extends State<_GradingDialog> {
                             'Total Points: ${widget.assignment.totalPoints}',
                             style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                           ),
-                          if (widget.submission.submittedAt != null)
-                            Text(
-                              'Submitted: ${widget.submission.formattedSubmittedDate}',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
+
+                    // All Attempts Section
+                    Text(
+                      'Submission Attempts (${widget.allSubmissions.length})',
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    ...widget.allSubmissions.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final submission = entry.value;
+                      final attemptNum = widget.allSubmissions.length - index;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: submission.isGraded ? Colors.green.withOpacity(0.05) : Colors.blue.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: submission.isGraded ? Colors.green.withOpacity(0.3) : Colors.blue.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  submission.isGraded ? Icons.check_circle : Icons.pending,
+                                  size: 16,
+                                  color: submission.isGraded ? Colors.green : Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Attempt #$attemptNum',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                const Spacer(),
+                                if (submission.submittedAt != null)
+                                  Text(
+                                    submission.formattedSubmittedDate,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  ),
+                              ],
+                            ),
+                            if (_getFilePath(submission) != null || _getFileUrl(submission) != null) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.attach_file, size: 16, color: Colors.blue),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      _getFileName(submission) ?? 'View File',
+                                      style: const TextStyle(fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.open_in_new, size: 18, color: Colors.blue),
+                                    onPressed: () => _openFile(submission),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+
                     // Score input
+                    Text(
+                      'Final Grade (applies to all attempts)',
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _scoreController,
                       decoration: InputDecoration(
@@ -640,55 +856,72 @@ class _GradingDialogState extends State<_GradingDialog> {
                     TextFormField(
                       controller: _feedbackController,
                       decoration: InputDecoration(
-                        labelText: 'Feedback (Optional)',
+                        labelText: 'Feedback *',
                         hintText: 'Write feedback for the student...',
                         prefixIcon: const Icon(Icons.comment_outlined),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       maxLines: 5,
                       textCapitalization: TextCapitalization.sentences,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please provide feedback for the student';
+                        }
+                        return null;
+                      },
                     ),
                   ],
                 ),
               ),
             ),
-            // Actions
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _saveGrade,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_isLoading ? 'Saving...' : 'Save Grade'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          // Actions at bottom
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, -3),
+                ),
+              ],
             ),
-          ],
-        ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveGrade,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save),
+                    label: Text(_isLoading ? 'Saving...' : 'Save Grade'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
