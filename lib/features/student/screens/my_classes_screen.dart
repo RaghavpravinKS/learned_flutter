@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:learned_flutter/core/theme/app_colors.dart';
 import 'package:learned_flutter/features/student/services/classroom_service.dart';
 
@@ -63,7 +64,7 @@ class MyClassesScreen extends ConsumerWidget {
           context.push('/classrooms');
         },
         icon: const Icon(Icons.explore),
-        label: const Text('Browse Classrooms'),
+        label: const Text('Enroll'),
         backgroundColor: AppColors.primary,
       ),
     );
@@ -101,7 +102,7 @@ class MyClassesScreen extends ConsumerWidget {
                           context.push('/classrooms');
                         },
                         icon: const Icon(Icons.explore),
-                        label: const Text('Browse Classrooms'),
+                        label: const Text('Enroll'),
                       ),
                       const SizedBox(width: 16),
                       OutlinedButton.icon(
@@ -137,13 +138,18 @@ class MyClassesScreen extends ConsumerWidget {
   }
 
   Widget _buildClassroomCard(BuildContext context, Map<String, dynamic> classroom) {
-    final theme = Theme.of(context);
     final enrollmentDate = DateTime.tryParse(classroom['enrollment_date'] ?? '');
     final nextSession = DateTime.tryParse(classroom['next_session'] ?? '');
     final progress = (classroom['progress'] as num?)?.toDouble() ?? 0.0;
+    final description = classroom['description'] as String?;
+    final assignmentCount = classroom['assignment_count'] as int? ?? 0;
+    final materialsCount = classroom['materials_count'] as int? ?? 0;
+    final sessionsCount = classroom['sessions_count'] as int? ?? 0;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
           // Navigate to classroom home for enrolled students
@@ -151,105 +157,137 @@ class MyClassesScreen extends ConsumerWidget {
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with classroom name and status
+              // Header row - Similar to teacher's design
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.subject, color: AppColors.primary, size: 20),
+                    child: Icon(Icons.school, color: AppColors.primary, size: 24),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           classroom['name'] ?? 'Unknown Classroom',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
-                          '${classroom['subject']} • Grade ${classroom['grade_level']}',
-                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                          '${classroom['subject']} • Grade ${classroom['grade_level']} • ${classroom['board'] ?? 'N/A'}',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Active',
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.green[700], fontWeight: FontWeight.w500),
-                    ),
-                  ),
+                  Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
                 ],
               ),
-              const SizedBox(height: 12),
 
-              // Teacher and enrollment info
+              // Description (if available)
+              if (description != null && description.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  description,
+                  style: TextStyle(fontSize: 13, color: Colors.grey[700], height: 1.4),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Teacher info
               Row(
                 children: [
-                  Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                  Icon(Icons.person_outline, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
                     classroom['teacher_name'] ?? 'Teacher Info Unavailable',
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
                   ),
-                  const SizedBox(width: 16),
                   if (enrollmentDate != null) ...[
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                    const Spacer(),
+                    Icon(Icons.calendar_today, size: 14, color: Colors.grey[500]),
                     const SizedBox(width: 4),
                     Text(
                       'Enrolled ${_formatDate(enrollmentDate)}',
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ],
               ),
 
               if (progress > 0) ...[
-                const SizedBox(height: 12),
-                // Progress bar
+                const SizedBox(height: 16),
+                // Progress bar - Similar to enrollment progress in teacher's design
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Progress', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+                        Text(
+                          'Course Progress',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700]),
+                        ),
                         Text(
                           '${(progress * 100).toInt()}%',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.primary,
-                          ),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[700]),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     LinearProgressIndicator(
                       value: progress,
                       backgroundColor: Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        progress >= 0.9
+                            ? Colors.green
+                            : progress >= 0.5
+                            ? AppColors.primary
+                            : Colors.orange,
+                      ),
                     ),
                   ],
                 ),
               ],
 
+              const SizedBox(height: 16),
+
+              // Stats row - Similar to teacher's quick stats
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildQuickStat(icon: Icons.assignment, count: assignmentCount, label: 'Assignments'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildQuickStat(icon: Icons.folder, count: materialsCount, label: 'Materials'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildQuickStat(icon: Icons.event, count: sessionsCount, label: 'Sessions'),
+                  ),
+                ],
+              ),
+
               // Next session info (if available)
               if (nextSession != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -267,20 +305,13 @@ class MyClassesScreen extends ConsumerWidget {
                           children: [
                             Text(
                               'Next Session',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.blue[700],
-                              ),
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blue[700]),
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              _formatDateTime(nextSession),
-                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
-                            ),
+                            Text(_formatDateTime(nextSession), style: TextStyle(fontSize: 11, color: Colors.grey[700])),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, size: 20, color: Colors.grey[400]),
                     ],
                   ),
                 ),
@@ -288,6 +319,28 @@ class MyClassesScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStat({required IconData icon, required int count, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(height: 4),
+          Text(
+            '$count',
+            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+          ),
+          Text(
+            label,
+            style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

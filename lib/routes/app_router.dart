@@ -28,6 +28,7 @@ import 'package:learned_flutter/features/student/screens/active_session_screen.d
 import 'package:learned_flutter/features/student/screens/session_feedback_screen.dart';
 import 'package:learned_flutter/features/student/screens/progress_screen.dart';
 import 'package:learned_flutter/features/student/screens/learning_materials_screen.dart';
+import 'package:learned_flutter/features/student/models/session_model.dart';
 import 'package:learned_flutter/features/student/screens/material_viewer_screen.dart';
 import 'package:learned_flutter/features/student/screens/payment_screen.dart';
 import 'package:learned_flutter/features/student/models/assignment_model.dart';
@@ -326,7 +327,13 @@ final router = GoRouter(
           path: 'session/join/:sessionId',
           pageBuilder: (context, state) {
             final sessionId = state.pathParameters['sessionId']!;
-            final sessionData = state.extra as Map<String, dynamic>?;
+            // Handle both SessionModel objects and Map<String, dynamic>
+            Map<String, dynamic>? sessionData;
+            if (state.extra is SessionModel) {
+              sessionData = (state.extra as SessionModel).toJson();
+            } else if (state.extra is Map<String, dynamic>) {
+              sessionData = state.extra as Map<String, dynamic>;
+            }
             return MaterialPage(
               key: state.pageKey,
               child: JoinSessionScreen(sessionId: sessionId, sessionData: sessionData),
@@ -338,7 +345,13 @@ final router = GoRouter(
               path: 'active',
               pageBuilder: (context, state) {
                 final sessionId = state.pathParameters['sessionId']!;
-                final sessionData = state.extra as Map<String, dynamic>?;
+                // Handle both SessionModel objects and Map<String, dynamic>
+                Map<String, dynamic>? sessionData;
+                if (state.extra is SessionModel) {
+                  sessionData = (state.extra as SessionModel).toJson();
+                } else if (state.extra is Map<String, dynamic>) {
+                  sessionData = state.extra as Map<String, dynamic>;
+                }
                 return MaterialPage(
                   key: state.pageKey,
                   child: ActiveSessionScreen(sessionId: sessionId, sessionData: sessionData),

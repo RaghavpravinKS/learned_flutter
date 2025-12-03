@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,6 +26,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
   late final PageController _pageController;
   final TeacherService _teacherService = TeacherService();
   TeacherDrawerSection _currentDrawerSection = TeacherDrawerSection.dashboard;
+  DateTime? _lastBackPressTime;
 
   // State variables for dashboard data
   Map<String, int> _statistics = {};
@@ -40,6 +42,30 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
     _loadTeacherData();
+  }
+
+  Future<bool> _onWillPop() async {
+    final now = DateTime.now();
+
+    // If last back press was more than 2 seconds ago, show message
+    if (_lastBackPressTime == null || now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+      _lastBackPressTime = now;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Press back again to exit'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      return false; // Don't exit
+    }
+
+    // Exit app using SystemNavigator
+    return true; // Allow pop, which will exit the app
   }
 
   Future<void> _loadTeacherData() async {
@@ -251,45 +277,57 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
     final pageLabels = ['Home', 'Classes'];
     final pageIcons = [Icons.home_outlined, Icons.class_outlined];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_getAppBarTitle()),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () {
-              // TODO: Navigate to notifications
-            },
-          ),
-        ],
-      ),
-      drawer: _buildDrawer(context, _teacherName),
-      body: _getCurrentBody(_teacherName),
-      bottomNavigationBar: _currentDrawerSection == TeacherDrawerSection.dashboard
-          ? BottomNavigationBar(
-              type: BottomNavigationBarType.fixed,
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-                _pageController.animateToPage(
-                  index,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) async {
+        if (didPop) return;
+
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          // Exit the app
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_getAppBarTitle()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none_rounded),
+              onPressed: () {
+                // TODO: Navigate to notifications
               },
-              selectedItemColor: AppColors.primary,
-              unselectedItemColor: Colors.grey[600],
-              items: List.generate(
-                2,
-                (index) => BottomNavigationBarItem(icon: Icon(pageIcons[index]), label: pageLabels[index]),
-              ),
-            )
-          : null,
+            ),
+          ],
+        ),
+        drawer: _buildDrawer(context, _teacherName),
+        body: _getCurrentBody(_teacherName),
+        bottomNavigationBar: _currentDrawerSection == TeacherDrawerSection.dashboard
+            ? BottomNavigationBar(
+                type: BottomNavigationBarType.fixed,
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                selectedItemColor: AppColors.primary,
+                unselectedItemColor: Colors.grey[600],
+                items: List.generate(
+                  2,
+                  (index) => BottomNavigationBarItem(icon: Icon(pageIcons[index]), label: pageLabels[index]),
+                ),
+              )
+            : null,
+      ),
     );
   }
 
@@ -493,14 +531,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
               subtitle: 'Manage assignments & tests',
               onTap: () {
                 context.push('/teacher/assignments');
-              },
-            ),
-            _buildActionCard(
-              icon: Icons.add_circle_outline,
-              title: 'Create Session',
-              subtitle: 'Schedule a class',
-              onTap: () {
-                context.push('/teacher/sessions');
               },
             ),
           ],

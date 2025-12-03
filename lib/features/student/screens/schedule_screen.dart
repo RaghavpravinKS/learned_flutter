@@ -189,8 +189,11 @@ class ScheduleBody extends ConsumerWidget {
               final teacher = classroom['teacher'] as Map<String, dynamic>? ?? {};
               final teacherUser = teacher['users'] as Map<String, dynamic>? ?? {};
 
-              // Get subject from classroom
-              final subject = classroom['subject'] as String? ?? 'No Subject';
+              // Get classroom name
+              final classroomName = classroom['name'] as String? ?? 'No Classroom';
+
+              // Get session title (topic)
+              final sessionTitle = session['title'] as String? ?? 'Class Session';
 
               // Get teacher name safely
               final firstName = teacherUser['first_name'] as String? ?? '';
@@ -205,14 +208,19 @@ class ScheduleBody extends ConsumerWidget {
                     backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
                     child: Icon(Icons.video_call, color: Theme.of(context).primaryColor),
                   ),
-                  title: Text(subject, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(sessionTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
                       Text(
-                        teacherName.isNotEmpty ? teacherName : 'No Teacher',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        classroomName,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        teacherName.isNotEmpty ? 'with $teacherName' : 'No Teacher',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -225,21 +233,6 @@ class ScheduleBody extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      if (session['meeting_url'] != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.videocam, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Online Session',
-                              style: Theme.of(
-                                context,
-                              ).textTheme.bodySmall?.copyWith(color: Theme.of(context).primaryColor),
-                            ),
-                          ],
-                        ),
-                      ],
                     ],
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),

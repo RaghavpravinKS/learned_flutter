@@ -1,6 +1,6 @@
 # 🎓 LearnED Platform - Complete System Architecture & Design Documentation
 
-*Consolidated Technical Specification - Last Updated: October 19, 2025*
+*Consolidated Technical Specification - Last Updated: October 27, 2025*
 
 ---
 
@@ -128,7 +128,7 @@ teachers → teacher_availability → teacher_documents → classrooms
 #### **Tables Included:**
 1. ✅ **Core Entities**: users, students, teachers, parents, classrooms
 2. ✅ **Business Logic**: payment_plans, classroom_pricing, student_enrollments, payments
-3. ✅ **Learning**: class_sessions, assignments, assignment_questions, learning_materials, student_assignment_attempts
+3. ✅ **Learning**: recurring_sessions ✨, class_sessions, assignments, assignment_questions, learning_materials, student_assignment_attempts
 4. ✅ **Tracking**: session_attendance, student_progress, system_notifications
 5. ✅ **Administration**: admin_activities, teacher_documents, teacher_verification
 6. ✅ **Relationships**: parent_student_relations
@@ -919,23 +919,92 @@ enrollment_requests → payments → student_classroom_assignments → student_s
 
 ---
 
-### 6. Class Session Management 📅 *(Future Implementation)*
+### 6. Class Session Management 📅 *(Updated October 27, 2025)*
 
-#### **Session Lifecycle**
+#### **Session Lifecycle with Recurring Support** ✨ **NEW**
 ```
-class_sessions → session_attendance → student_progress
+recurring_sessions → class_sessions → session_attendance → student_progress
 ```
 
-**Flow:**
-1. **Session Creation**: Teachers create `class_sessions` with scheduled times
-2. **Student Attendance**: Track in `session_attendance` with join/leave times
-3. **Progress Tracking**: Aggregate data in `student_progress` weekly
+**Enhanced Flow:**
+1. **One-Time Session Creation**: Teachers create individual `class_sessions` with scheduled times
+2. **Recurring Session Creation** ✨: Teachers create `recurring_sessions` templates that auto-generate instances
+3. **Student Attendance**: Track in `session_attendance` with join/leave times
+4. **Progress Tracking**: Aggregate data in `student_progress` weekly
+
+#### **Recurring Sessions Feature** ✨ **NEW - October 27, 2025**
+
+**Purpose:** Allow teachers to create weekly recurring sessions (e.g., Monday, Wednesday, Friday classes) instead of manually creating each session.
+
+**Architecture:**
+- **`recurring_sessions` table**: Stores the recurrence pattern/template
+- **`class_sessions` table**: Auto-generated instances from recurring template
+- **Relationship**: Each `class_sessions` record can link to a parent `recurring_sessions` via `recurring_session_id`
+
+**Recurrence Pattern:**
+- **Type**: Weekly (daily support planned for future)
+- **Days**: Array of integers [0-6] where 0=Sunday, 1=Monday, ..., 6=Saturday
+  - Example: `{1,3,5}` = Every Monday, Wednesday, and Friday
+- **Time**: Same start_time and end_time for all occurrences
+- **Duration**: Start date to end date (or indefinite if end_date is NULL)
+
+**Key Features:**
+- ✅ Multi-day selection (e.g., Mon, Wed, Fri)
+- ✅ Auto-generation of session instances up to 3 months ahead (configurable)
+- ✅ Edit entire series or individual instances
+- ✅ Delete entire series or individual instances
+- ✅ No end date option for ongoing classes
+- ✅ Safety limit: Max 1 year of sessions generated at once
+
+**Tables Structure:**
+
+```sql
+-- Recurring session template
+recurring_sessions:
+  - id (uuid)
+  - classroom_id (varchar)
+  - title, description
+  - recurrence_type ('weekly', 'daily')
+  - recurrence_days (integer[]) -- [1,3,5] for Mon/Wed/Fri
+  - start_time, end_time
+  - start_date, end_date
+  - session_type, meeting_url, is_recorded
+  
+-- Individual session instances
+class_sessions:
+  - id (uuid)
+  - recurring_session_id (uuid) ← Links to parent template
+  - is_recurring_instance (boolean) ← True if auto-generated
+  - [all existing fields]
+```
+
+**Backend Functions:**
+1. `generate_recurring_sessions(recurring_session_id, months_ahead)` - Creates session instances
+2. `delete_recurring_series(recurring_session_id, delete_future_only)` - Deletes series or future instances
+3. `update_recurring_series(recurring_session_id, update_data, update_future_only)` - Updates series/instances
+
+**UI Flow:**
+1. Teacher opens "Create Session" screen
+2. Selects tab: **"One-Time Session"** or **"Recurring Session"** ✨
+3. For recurring:
+   - Selects days of week (checkboxes)
+   - Sets start/end dates
+   - Sets time (same for all days)
+   - Preview shows list of upcoming sessions
+4. System generates all instances automatically
+5. Student schedule displays all generated sessions normally (no UX change)
+
+**Security:**
+- RLS policies ensure teachers can only manage sessions for their classrooms
+- Cascade delete: Deleting recurring_session deletes all its instances
+- Audit trail for bulk operations
 
 **Features:**
 - Meeting URLs for virtual classes
 - Recording storage
 - Attendance scoring
 - Participation metrics
+- ✨ **Bulk session creation via recurring patterns**
 
 ---
 
@@ -1580,12 +1649,50 @@ CREATE TABLE public.class_sessions (
   recording_url text,
   is_recorded boolean DEFAULT false,
   status session_status DEFAULT 'scheduled',
+  recurring_session_id uuid, -- ✨ NEW: Links to recurring_sessions template
+  is_recurring_instance boolean DEFAULT false, -- ✨ NEW: True if auto-generated from recurring pattern
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT class_sessions_pkey PRIMARY KEY (id),
-  CONSTRAINT class_sessions_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id)
+  CONSTRAINT class_sessions_classroom_id_fkey FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id),
+  CONSTRAINT class_sessions_recurring_session_id_fkey FOREIGN KEY (recurring_session_id) REFERENCES public.recurring_sessions(id) ON DELETE CASCADE -- ✨ NEW
 );
 ```
+
+##### 10a. **recurring_sessions** (New - October 27, 2025) ✨
+```sql
+CREATE TABLE public.recurring_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  classroom_id character varying NOT NULL,
+  title character varying NOT NULL,
+  description text,
+  session_type character varying DEFAULT 'live',
+  meeting_url text,
+  is_recorded boolean DEFAULT false,
+  
+  -- Recurrence Pattern
+  recurrence_type character varying NOT NULL CHECK (recurrence_type IN ('weekly', 'daily')),
+  recurrence_days integer[] NOT NULL, -- Array: 0=Sunday, 1=Monday, ..., 6=Saturday
+  start_time time NOT NULL,
+  end_time time NOT NULL,
+  
+  -- Recurrence Bounds
+  start_date date NOT NULL,
+  end_date date, -- NULL = no end date (continues indefinitely)
+  
+  -- Metadata
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  
+  CONSTRAINT recurring_sessions_classroom_id_fkey 
+    FOREIGN KEY (classroom_id) REFERENCES public.classrooms(id) ON DELETE CASCADE
+);
+```
+**Purpose:** Template table for recurring class sessions (e.g., weekly Monday/Wednesday/Friday classes)  
+**Key Fields:**
+- `recurrence_days`: Array of day numbers, e.g., `{1,3,5}` for Mon/Wed/Fri
+- `end_date`: NULL means ongoing/indefinite recurrence
+- Generates `class_sessions` instances automatically via backend function
 
 ##### 11. **assignments** (Important - MVP)
 ```sql

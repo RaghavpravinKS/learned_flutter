@@ -1,7 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/recurring_session_model.dart';
+import 'recurring_session_service.dart';
 
 class TeacherService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final RecurringSessionService _recurringService = RecurringSessionService();
 
   /// Get teacher's assigned classrooms with student counts and basic stats
   Future<List<Map<String, dynamic>>> getTeacherClassrooms(String teacherId) async {
@@ -19,6 +23,7 @@ class TeacherService {
             max_students,
             current_students,
             is_active,
+            minimum_monthly_hours,
             created_at,
             updated_at
           ''')
@@ -227,5 +232,87 @@ class TeacherService {
       print('Error fetching recent activities: $e');
       return [];
     }
+  }
+
+  // ============================================================================
+  // Recurring Session Methods
+  // ============================================================================
+
+  /// Create a new recurring session
+  Future<String> createRecurringSession(RecurringSessionModel session) async {
+    return await _recurringService.createRecurringSession(session);
+  }
+
+  /// Get all recurring sessions for a classroom
+  Future<List<RecurringSessionModel>> getRecurringSessionsForClassroom(String classroomId) async {
+    return await _recurringService.getRecurringSessionsForClassroom(classroomId);
+  }
+
+  /// Get a single recurring session by ID
+  Future<RecurringSessionModel> getRecurringSession(String id) async {
+    return await _recurringService.getRecurringSession(id);
+  }
+
+  /// Update a recurring series
+  Future<int> updateRecurringSeries({
+    required String recurringSessionId,
+    required Map<String, dynamic> updates,
+    bool updateFutureOnly = true,
+  }) async {
+    return await _recurringService.updateRecurringSeries(
+      recurringSessionId: recurringSessionId,
+      updates: updates,
+      updateFutureOnly: updateFutureOnly,
+    );
+  }
+
+  /// Delete a recurring series
+  Future<int> deleteRecurringSeries({
+    required String recurringSessionId,
+    bool deleteFutureOnly = false,
+    DateTime? fromDate,
+  }) async {
+    return await _recurringService.deleteRecurringSeries(
+      recurringSessionId: recurringSessionId,
+      deleteFutureOnly: deleteFutureOnly,
+      fromDate: fromDate,
+    );
+  }
+
+  /// Generate session instances
+  Future<int> generateSessionInstances({required String recurringSessionId, int monthsAhead = 3}) async {
+    return await _recurringService.generateSessionInstances(
+      recurringSessionId: recurringSessionId,
+      monthsAhead: monthsAhead,
+    );
+  }
+
+  /// Preview recurring session hours before creation
+  Future<Map<String, dynamic>> previewRecurringSessionHours({
+    required String classroomId,
+    required TimeOfDay startTime,
+    required TimeOfDay endTime,
+    required List<int> recurrenceDays,
+    required DateTime startDate,
+    DateTime? endDate,
+  }) async {
+    return await _recurringService.previewRecurringSessionHours(
+      classroomId: classroomId,
+      startTime: startTime,
+      endTime: endTime,
+      recurrenceDays: recurrenceDays,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  /// Delete a single recurring session instance
+  Future<void> deleteSessionInstance(String sessionId) async {
+    await _recurringService.deleteInstance(sessionId);
+  }
+
+  /// Update a single recurring session instance
+  Future<void> updateSessionInstance({required String sessionId, required Map<String, dynamic> updates}) async {
+    await _recurringService.updateInstance(sessionId: sessionId, updates: updates);
   }
 }

@@ -120,6 +120,7 @@ class SessionRepository {
           'start_time': startTime.toIso8601String(),
           'end_time': endTime.toIso8601String(),
           'is_live': isLive,
+          'meeting_url': sessionData['meeting_url'] as String?,
         };
 
         sessions.add(SessionModel.fromMap(sessionMap));

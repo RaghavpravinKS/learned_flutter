@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/theme/app_colors.dart';
 
 class JoinSessionScreen extends ConsumerStatefulWidget {
   final String sessionId;
@@ -35,8 +37,19 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
     final endTimeStr = _sessionData['end_time'] as String?;
 
     if (sessionDate != null && startTimeStr != null && endTimeStr != null) {
+      // Old format: separate date and time strings
       _startTime = DateTime.parse('$sessionDate $startTimeStr').toLocal();
       _endTime = DateTime.parse('$sessionDate $endTimeStr').toLocal();
+    } else if (startTimeStr != null && endTimeStr != null) {
+      // New format: ISO 8601 strings from SessionModel.toJson()
+      try {
+        _startTime = DateTime.parse(startTimeStr).toLocal();
+        _endTime = DateTime.parse(endTimeStr).toLocal();
+      } catch (e) {
+        // Fallback to current time if parsing fails
+        _startTime = DateTime.now();
+        _endTime = DateTime.now().add(const Duration(hours: 1));
+      }
     } else {
       // Fallback to current time if data is missing
       _startTime = DateTime.now();
@@ -46,10 +59,10 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
 
   Future<void> _checkIfCanJoin() async {
     final now = DateTime.now();
-    final joinTime = _startTime.subtract(const Duration(minutes: 5));
 
     setState(() {
-      _canJoin = now.isAfter(joinTime) && now.isBefore(_endTime);
+      // Allow joining anytime before the session ends
+      _canJoin = now.isBefore(_endTime);
     });
   }
 
@@ -61,21 +74,51 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
     });
 
     try {
-      // TODO: Add any pre-session checks or initialization
-      await Future.delayed(const Duration(seconds: 1)); // Simulate network call
+      // Get meeting URL from session data
+      final meetingUrl = _sessionData['meeting_url'] as String?;
 
-      if (mounted) {
-        // Navigate to active session screen
-        // Using push instead of go to maintain the navigation stack
-        // This allows users to go back to the join screen if needed
-        final currentPath = GoRouterState.of(context).matchedLocation;
-        context.push('$currentPath/active', extra: _sessionData);
+      print('📞 Attempting to join session with URL: $meetingUrl');
+
+      if (meetingUrl == null || meetingUrl.isEmpty) {
+        throw 'No meeting URL available for this session';
+      }
+
+      // Validate URL format
+      if (!meetingUrl.startsWith('http://') && !meetingUrl.startsWith('https://')) {
+        throw 'Invalid meeting URL format. URL must start with http:// or https://';
+      }
+
+      // Launch the meeting URL
+      final uri = Uri.parse(meetingUrl);
+      print('🔗 Parsed URI: $uri');
+
+      // Try to launch with platformDefault first (opens in browser or app)
+      // This is more reliable than externalApplication on Android
+      try {
+        print('✅ Attempting to launch URL...');
+        final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+
+        if (launched) {
+          print('✅ URL launched successfully');
+        } else {
+          print('❌ Launch returned false');
+          throw 'Failed to open meeting URL';
+        }
+      } catch (launchError) {
+        print('❌ Launch error: $launchError');
+        throw 'Could not open meeting URL. Error: $launchError';
       }
     } catch (e) {
+      print('❌ Error joining session: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error joining session: $e'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error joining session: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(label: 'OK', textColor: Colors.white, onPressed: () {}),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -89,21 +132,41 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final classroom = _sessionData['classrooms'] as Map<String, dynamic>? ?? {};
-    final teacher = classroom['teacher'] as Map<String, dynamic>? ?? {};
-    final teacherUser = teacher['users'] as Map<String, dynamic>? ?? {};
 
-    // Get subject from classroom
-    final subject = classroom['subject'] as String? ?? 'No Subject';
+    // Handle two data formats:
+    // 1. Nested format from schedule screen: { classrooms: { subject, teacher: { users: { first_name, last_name } } } }
+    // 2. Flat format from SessionModel.toJson(): { subject, teacher_name }
 
-    // Get teacher name
-    final firstName = teacherUser['first_name'] as String? ?? '';
-    final lastName = teacherUser['last_name'] as String? ?? '';
-    final teacherName = '$firstName $lastName'.trim();
+    String subject;
+    String teacherName;
+
+    if (_sessionData['classrooms'] != null) {
+      // Nested format from schedule screen
+      final classroom = _sessionData['classrooms'] as Map<String, dynamic>? ?? {};
+      final teacher = classroom['teacher'] as Map<String, dynamic>? ?? {};
+      final teacherUser = teacher['users'] as Map<String, dynamic>? ?? {};
+
+      subject = classroom['subject'] as String? ?? 'No Subject';
+
+      final firstName = teacherUser['first_name'] as String? ?? '';
+      final lastName = teacherUser['last_name'] as String? ?? '';
+      teacherName = '$firstName $lastName'.trim();
+    } else {
+      // Flat format from SessionModel.toJson()
+      subject = _sessionData['subject'] as String? ?? 'No Subject';
+      teacherName = _sessionData['teacher_name'] as String? ?? 'Teacher';
+    }
+
+    if (teacherName.isEmpty) {
+      teacherName = 'Teacher';
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Join Session'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
@@ -161,10 +224,6 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                       Icons.schedule,
                       '${DateFormat.jm().format(_startTime)} - ${DateFormat.jm().format(_endTime)}',
                     ),
-                    if (_sessionData['meeting_url'] != null) ...[
-                      const SizedBox(height: 8),
-                      _buildInfoRow(Icons.videocam, 'Online Session', isOnline: true),
-                    ],
                   ],
                 ),
               ),
@@ -190,14 +249,14 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : Text(_canJoin ? 'Join Session' : 'Session Not Started', style: const TextStyle(fontSize: 16)),
+                    : Text(_canJoin ? 'Join Session' : 'Session Ended', style: const TextStyle(fontSize: 16)),
               ),
             ),
 
             if (!_canJoin) ...[
               const SizedBox(height: 16),
               Text(
-                'You can join the session 5 minutes before the scheduled start time.',
+                'This session has already ended.',
                 style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
                 textAlign: TextAlign.center,
               ),

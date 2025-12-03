@@ -104,6 +104,7 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
         final firstName = user?['first_name'] ?? '';
         final lastName = user?['last_name'] ?? '';
         final fullName = (firstName + ' ' + lastName).trim();
+
         return AttendanceModel.fromMap({
           ...item,
           'student_name': fullName.isNotEmpty ? fullName : 'Unknown',
@@ -120,24 +121,29 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
     }
   }
 
-  String _getAttendanceStatus(String studentId) {
+  String? _getAttendanceStatus(String studentId) {
     // Check if there's a local change
     if (_changedStatuses.containsKey(studentId)) {
-      return _changedStatuses[studentId]!;
+      return _changedStatuses[studentId];
     }
 
     // Check existing attendance
-    final existing = _attendanceList.firstWhere(
-      (a) => a.studentId == studentId,
-      orElse: () => AttendanceModel(
-        sessionId: widget.session.id,
-        studentId: studentId,
-        studentName: '',
-        attendanceStatus: 'absent',
-      ),
-    );
+    try {
+      final existing = _attendanceList.firstWhere((a) => a.studentId == studentId);
+      return existing.attendanceStatus;
+    } catch (e) {
+      return null; // Not marked yet
+    }
+  }
 
-    return existing.attendanceStatus;
+  String? _getSavedAttendanceStatus(String studentId) {
+    // Get the saved status from database (ignore local changes)
+    try {
+      final existing = _attendanceList.firstWhere((a) => a.studentId == studentId);
+      return existing.attendanceStatus;
+    } catch (e) {
+      return null; // Not marked yet
+    }
   }
 
   void _updateAttendanceStatus(String studentId, String status) {
@@ -384,14 +390,20 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
     final email = user['email'] as String;
 
     final currentStatus = _getAttendanceStatus(studentId);
+    final savedStatus = _getSavedAttendanceStatus(studentId);
     final hasChanges = _changedStatuses.containsKey(studentId);
+    final isAlreadyMarked = savedStatus != null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: hasChanges ? 3 : 1,
+      elevation: hasChanges ? 3 : (isAlreadyMarked ? 2 : 1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: hasChanges ? BorderSide(color: Colors.orange, width: 2) : BorderSide.none,
+        side: hasChanges
+            ? BorderSide(color: Colors.orange, width: 2)
+            : isAlreadyMarked
+            ? BorderSide(color: _getStatusColor(savedStatus).withOpacity(0.5), width: 1.5)
+            : BorderSide.none,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -402,10 +414,13 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: _getStatusColor(currentStatus).withOpacity(0.2),
+                  backgroundColor: _getStatusColor(currentStatus ?? 'not_marked').withOpacity(0.2),
                   child: Text(
                     name[0].toUpperCase(),
-                    style: TextStyle(color: _getStatusColor(currentStatus), fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: _getStatusColor(currentStatus ?? 'not_marked'),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -415,6 +430,48 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
                     children: [
                       Text(name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
                       Text(email, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      // Show saved status with better visual feedback
+                      if (isAlreadyMarked)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(savedStatus).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _getStatusColor(savedStatus).withOpacity(0.4), width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_getStatusIcon(savedStatus), size: 12, color: _getStatusColor(savedStatus)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Marked: ${_capitalizeFirst(savedStatus)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: _getStatusColor(savedStatus),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, size: 12, color: Colors.grey[400]),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Not marked yet',
+                                style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -425,9 +482,16 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
                       color: Colors.orange.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      'Modified',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange[700]),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit, size: 12, color: Colors.orange[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          isAlreadyMarked ? 'Updating' : 'New',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange[700]),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -437,13 +501,13 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
             // Attendance status buttons
             Row(
               children: [
-                _buildStatusButton('present', 'Present', Icons.check_circle, studentId, currentStatus),
+                _buildStatusButton('present', 'Present', Icons.check_circle, studentId, currentStatus ?? ''),
                 const SizedBox(width: 8),
-                _buildStatusButton('absent', 'Absent', Icons.cancel, studentId, currentStatus),
+                _buildStatusButton('absent', 'Absent', Icons.cancel, studentId, currentStatus ?? ''),
                 const SizedBox(width: 8),
-                _buildStatusButton('late', 'Late', Icons.access_time, studentId, currentStatus),
+                _buildStatusButton('late', 'Late', Icons.access_time, studentId, currentStatus ?? ''),
                 const SizedBox(width: 8),
-                _buildStatusButton('excused', 'Excused', Icons.event_busy, studentId, currentStatus),
+                _buildStatusButton('excused', 'Excused', Icons.event_busy, studentId, currentStatus ?? ''),
               ],
             ),
           ],
@@ -496,9 +560,31 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
         return Colors.orange;
       case 'excused':
         return Colors.blue;
+      case 'not_marked':
+        return Colors.grey;
       default:
         return Colors.grey;
     }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'present':
+        return Icons.check_circle;
+      case 'absent':
+        return Icons.cancel;
+      case 'late':
+        return Icons.access_time;
+      case 'excused':
+        return Icons.event_busy;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  String _capitalizeFirst(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
   }
 
   Widget _buildBottomBar() {

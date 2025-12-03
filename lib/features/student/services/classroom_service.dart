@@ -427,6 +427,7 @@ class ClassroomService {
                 name,
                 subject,
                 grade_level,
+                board,
                 description,
                 teacher_id,
                 teachers(
@@ -478,17 +479,64 @@ class ClassroomService {
                 }
               }
 
+              // Fetch additional statistics for the classroom
+              final classroomId = classroom['id'];
+              int assignmentCount = 0;
+              int materialsCount = 0;
+              int sessionsCount = 0;
+
+              // Get assignment count
+              try {
+                final assignmentResponse = await _supabase
+                    .from('assignments')
+                    .select('id')
+                    .eq('classroom_id', classroomId);
+                assignmentCount = assignmentResponse.length;
+              } catch (e) {
+                print('Error fetching assignment count: $e');
+              }
+
+              // Get materials count
+              try {
+                final materialsResponse = await _supabase
+                    .from('learning_materials')
+                    .select('id')
+                    .eq('classroom_id', classroomId);
+                materialsCount = materialsResponse.length;
+              } catch (e) {
+                print('Error fetching materials count: $e');
+              }
+
+              // Get upcoming sessions count (next 30 days)
+              try {
+                final today = DateTime.now().toIso8601String().split('T')[0];
+                final thirtyDaysLater = DateTime.now().add(const Duration(days: 30)).toIso8601String().split('T')[0];
+                final sessionsResponse = await _supabase
+                    .from('class_sessions')
+                    .select('id')
+                    .eq('classroom_id', classroomId)
+                    .gte('session_date', today)
+                    .lte('session_date', thirtyDaysLater);
+                sessionsCount = sessionsResponse.length;
+              } catch (e) {
+                print('Error fetching sessions count: $e');
+              }
+
               enrolledClassrooms.add({
                 'id': classroom['id'],
                 'name': classroom['name'],
                 'subject': classroom['subject'],
                 'grade_level': classroom['grade_level'],
                 'description': classroom['description'],
+                'board': classroom['board'],
                 'teacher_name': teacherName,
                 'enrollment_date': assignment['enrolled_date'],
                 'progress': (assignment['progress'] as num?)?.toDouble() ?? 0.0,
                 'next_session': classroom['next_session_date'],
                 'status': assignment['status'],
+                'assignment_count': assignmentCount,
+                'materials_count': materialsCount,
+                'sessions_count': sessionsCount,
               });
             }
           }
@@ -543,16 +591,64 @@ class ClassroomService {
               }
             }
 
+            // Fetch additional statistics for the classroom
+            final classroomId = classroom['id'];
+            int assignmentCount = 0;
+            int materialsCount = 0;
+            int sessionsCount = 0;
+
+            // Get assignment count
+            try {
+              final assignmentResponse = await _supabase
+                  .from('assignments')
+                  .select('id')
+                  .eq('classroom_id', classroomId);
+              assignmentCount = assignmentResponse.length;
+            } catch (e) {
+              print('Error fetching assignment count: $e');
+            }
+
+            // Get materials count
+            try {
+              final materialsResponse = await _supabase
+                  .from('learning_materials')
+                  .select('id')
+                  .eq('classroom_id', classroomId);
+              materialsCount = materialsResponse.length;
+            } catch (e) {
+              print('Error fetching materials count: $e');
+            }
+
+            // Get upcoming sessions count (next 30 days)
+            try {
+              final today = DateTime.now().toIso8601String().split('T')[0];
+              final thirtyDaysLater = DateTime.now().add(const Duration(days: 30)).toIso8601String().split('T')[0];
+              final sessionsResponse = await _supabase
+                  .from('class_sessions')
+                  .select('id')
+                  .eq('classroom_id', classroomId)
+                  .gte('session_date', today)
+                  .lte('session_date', thirtyDaysLater);
+              sessionsCount = sessionsResponse.length;
+            } catch (e) {
+              print('Error fetching sessions count: $e');
+            }
+
             enrolledClassrooms.add({
               'id': classroom['id'],
               'name': classroom['name'],
               'subject': classroom['subject'],
               'grade_level': classroom['grade_level'],
+              'description': classroom['description'],
+              'board': classroom['board'],
               'teacher_name': teacherName,
               'enrollment_date': assignment['enrolled_date'],
               'progress': 0.5, // Default progress
               'next_session': DateTime.now().add(const Duration(hours: 24)).toIso8601String(),
               'status': assignment['status'],
+              'assignment_count': assignmentCount,
+              'materials_count': materialsCount,
+              'sessions_count': sessionsCount,
             });
           }
         }

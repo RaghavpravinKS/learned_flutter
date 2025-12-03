@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,22 +10,14 @@ import '../../../../routes/app_routes.dart';
 import '../providers/course_progress_provider.dart';
 import '../providers/session_provider.dart';
 import '../providers/student_profile_provider.dart';
+import '../providers/classroom_provider.dart';
 import '../widgets/recent_activity_section.dart';
-import 'my_classes_screen.dart';
 import 'student_profile_screen.dart';
 import 'schedule_screen.dart';
-import 'learning_materials_screen.dart';
 import 'all_learning_materials_screen.dart';
+import 'my_classes_screen.dart' as my_classes;
 
-class _PageItem {
-  final Widget screen;
-  final String title;
-  final IconData icon;
-
-  _PageItem({required this.screen, required this.title, required this.icon});
-}
-
-enum DrawerSection { dashboard, schedule, materials, profile, settings, help }
+enum DrawerSection { dashboard, myClasses, schedule, profile }
 
 class StudentDashboardScreen extends ConsumerStatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -34,69 +27,63 @@ class StudentDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen> {
-  int _currentIndex = 0;
   DrawerSection _currentDrawerSection = DrawerSection.dashboard;
-  late final PageController _pageController;
-  late List<_PageItem> _pages;
+  DateTime? _lastBackPressTime;
 
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(initialPage: _currentIndex);
+  // Public method to switch drawer section
+  void switchToDrawerSection(DrawerSection section) {
+    setState(() {
+      _currentDrawerSection = section;
+    });
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  Future<bool> _onWillPop() async {
+    final now = DateTime.now();
+
+    // If last back press was more than 2 seconds ago, show message
+    if (_lastBackPressTime == null || now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+      _lastBackPressTime = now;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Press back again to exit'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      return false; // Don't exit
+    }
+
+    // Exit app using SystemNavigator instead of Navigator.pop
+    return true; // Allow pop, which will exit the app
   }
 
   String _getAppBarTitle() {
     switch (_currentDrawerSection) {
       case DrawerSection.dashboard:
-        return _pages[_currentIndex].title;
+        return 'Home';
+      case DrawerSection.myClasses:
+        return 'My Classes';
       case DrawerSection.schedule:
         return 'My Schedule';
       case DrawerSection.profile:
         return 'Profile';
-      case DrawerSection.settings:
-        return 'Settings';
-      case DrawerSection.help:
-        return 'Help & Support';
-      case DrawerSection.materials:
-        return 'Learning Materials';
     }
   }
 
   Widget _getCurrentBody(String userName) {
     switch (_currentDrawerSection) {
       case DrawerSection.dashboard:
-        return PageView.builder(
-          controller: _pageController,
-          itemCount: _pages.length,
-          onPageChanged: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          itemBuilder: (context, index) {
-            return _pages[index].screen;
-          },
-        );
+        return _buildHomeContent(userName);
+      case DrawerSection.myClasses:
+        return const my_classes.MyClassesScreen();
       case DrawerSection.schedule:
         return const _ScheduleBodyWrapper();
       case DrawerSection.profile:
         return const StudentProfileScreen();
-      case DrawerSection.settings:
-        return const Center(
-          child: Padding(padding: EdgeInsets.all(20.0), child: Text('Settings - Coming Soon')),
-        );
-      case DrawerSection.help:
-        return const Center(
-          child: Padding(padding: EdgeInsets.all(20.0), child: Text('Help & Support - Coming Soon')),
-        );
-      case DrawerSection.materials:
-        return const LearningMaterialsScreen();
     }
   }
 
@@ -115,28 +102,34 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
       }
     });
 
-    _pages = [
-      _PageItem(screen: _buildHomeContent(userName), title: 'Home', icon: Icons.home_outlined),
-      _PageItem(screen: const MyClassesScreen(), title: 'Classes', icon: Icons.school_outlined),
-    ];
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) async {
+        if (didPop) return;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_getAppBarTitle()),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () => context.go(AppRoutes.studentNotifications),
-          ),
-        ],
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          // Exit the app
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_getAppBarTitle()),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none_rounded),
+              onPressed: () => context.go(AppRoutes.studentNotifications),
+            ),
+          ],
+        ),
+        drawer: _buildDrawer(userName, profileImageUrl),
+        body: _getCurrentBody(userName),
+        floatingActionButton: _buildFloatingActionButton(),
       ),
-      drawer: _buildDrawer(userName, profileImageUrl),
-      body: _getCurrentBody(userName),
-      bottomNavigationBar: _currentDrawerSection == DrawerSection.dashboard ? _buildBottomNavigationBar(context) : null,
-      floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
@@ -190,11 +183,10 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
             ),
           ),
           _buildDrawerItem(icon: Icons.dashboard_outlined, title: 'Dashboard', section: DrawerSection.dashboard),
+          _buildDrawerItem(icon: Icons.school_outlined, title: 'My Classes', section: DrawerSection.myClasses),
           _buildDrawerItem(icon: Icons.schedule_outlined, title: 'Schedule', section: DrawerSection.schedule),
           _buildDrawerItem(icon: Icons.person_outline, title: 'Profile', section: DrawerSection.profile),
           const Divider(),
-          _buildDrawerItem(icon: Icons.settings_outlined, title: 'Settings', section: DrawerSection.settings),
-          _buildDrawerItem(icon: Icons.help_outline, title: 'Help & Support', section: DrawerSection.help),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
@@ -228,9 +220,6 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           Navigator.pop(context); // Close drawer
           setState(() {
             _currentDrawerSection = section;
-            if (section == DrawerSection.dashboard) {
-              _currentIndex = 0; // Reset to home tab
-            }
           });
         },
       ),
@@ -253,6 +242,8 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
             _buildWelcomeSection(userName),
             const SizedBox(height: 24),
             _buildQuickActionsButtons(context),
+            const SizedBox(height: 24),
+            _buildMyClassesSection(context),
             const SizedBox(height: 24),
             _buildUpcomingClasses(context),
             const SizedBox(height: 24),
@@ -423,10 +414,22 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
             ),
             TextButton(
-              onPressed: () => context.go(AppRoutes.studentSchedule),
-              child: Text(
-                'View All',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500, color: AppColors.primary),
+              onPressed: () {
+                print('🔘 View All button pressed');
+                print(' Current section before: $_currentDrawerSection');
+                // Switch to schedule section - we're already inside the state class
+                switchToDrawerSection(DrawerSection.schedule);
+                print('📍 Current section after: $_currentDrawerSection');
+              },
+              child: Row(
+                children: [
+                  Text(
+                    'View All',
+                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.primary),
+                ],
               ),
             ),
           ],
@@ -494,11 +497,8 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          if (isLive) {
-            context.push('${AppRoutes.studentSessionJoin}/${session.id}');
-          } else {
-            context.push('${AppRoutes.studentSessionDetails}/${session.id}');
-          }
+          // Always navigate to join session screen (whether live or not)
+          context.push('/student/schedule/session/join/${session.id}', extra: session);
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -621,30 +621,174 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
     return weekdays[date.weekday - 1];
   }
 
-  Widget _buildBottomNavigationBar(BuildContext context) {
+  Widget _buildMyClassesSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'My Classes',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[800]),
+            ),
+            TextButton(
+              onPressed: () {
+                switchToDrawerSection(DrawerSection.myClasses);
+              },
+              child: Row(
+                children: [
+                  Text(
+                    'View All',
+                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.primary),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Consumer(
+          builder: (context, ref, child) {
+            final enrolledClassroomsAsync = ref.watch(enrolledClassroomsProvider);
+            return enrolledClassroomsAsync.when(
+              data: (classrooms) {
+                if (classrooms.isEmpty) {
+                  return _buildNoClassesCard(context);
+                }
+                // Show only first 2 classes
+                final displayClasses = classrooms.take(2).toList();
+                return Column(
+                  children: [
+                    for (var classroom in displayClasses) ...[
+                      _buildClassroomPreviewCard(context, classroom),
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                );
+              },
+              loading: () => const Center(
+                child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator()),
+              ),
+              error: (error, stack) => _buildNoClassesCard(context),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNoClassesCard(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 10, offset: const Offset(0, -1)),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.school_outlined, color: Colors.grey.shade600, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('No enrolled classes', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Browse classrooms to get started',
+                      style: GoogleFonts.poppins(color: Colors.grey.shade600, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                context.push('/classrooms');
+              },
+              icon: const Icon(Icons.explore, size: 18),
+              label: const Text('Enroll'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
         ],
       ),
-      child: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-            _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-          });
+    );
+  }
+
+  Widget _buildClassroomPreviewCard(BuildContext context, Map<String, dynamic> classroom) {
+    final progress = (classroom['progress'] as num?)?.toDouble() ?? 0.0;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () {
+          context.push('/classroom-home/${classroom['id']}');
         },
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: Colors.grey,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        items: _pages.map((page) => BottomNavigationBarItem(icon: Icon(page.icon), label: page.title)).toList(),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.school, color: AppColors.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      classroom['name'] ?? 'Unknown Classroom',
+                      style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${classroom['subject']} • Grade ${classroom['grade_level']}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    if (progress > 0) ...[
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          progress >= 0.9
+                              ? Colors.green
+                              : progress >= 0.5
+                              ? AppColors.primary
+                              : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey[400]),
+            ],
+          ),
+        ),
       ),
     );
   }

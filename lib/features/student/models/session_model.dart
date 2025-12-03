@@ -8,6 +8,7 @@ class SessionModel {
   final DateTime startTime;
   final DateTime endTime;
   final bool isLive;
+  final String? meetingUrl;
 
   SessionModel({
     required this.id,
@@ -19,6 +20,7 @@ class SessionModel {
     required this.startTime,
     required this.endTime,
     this.isLive = false,
+    this.meetingUrl,
   });
 
   factory SessionModel.fromMap(Map<String, dynamic> map) {
@@ -32,6 +34,7 @@ class SessionModel {
       startTime: DateTime.parse(map['start_time'] as String),
       endTime: DateTime.parse(map['end_time'] as String),
       isLive: map['is_live'] as bool? ?? false,
+      meetingUrl: map['meeting_url'] as String?,
     );
   }
 
@@ -46,6 +49,7 @@ class SessionModel {
       'start_time': startTime.toIso8601String(),
       'end_time': endTime.toIso8601String(),
       'is_live': isLive,
+      'meeting_url': meetingUrl,
     };
   }
 }

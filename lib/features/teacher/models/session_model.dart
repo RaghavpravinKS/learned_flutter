@@ -12,6 +12,8 @@ class SessionModel {
   final String? recordingUrl;
   final bool isRecorded;
   final String status; // scheduled, in_progress, completed, cancelled
+  final String? recurringSessionId; // NEW: Links to recurring_sessions
+  final bool isRecurringInstance; // NEW: True if auto-generated from recurring pattern
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,6 +31,8 @@ class SessionModel {
     this.recordingUrl,
     this.isRecorded = false,
     this.status = 'scheduled',
+    this.recurringSessionId, // NEW
+    this.isRecurringInstance = false, // NEW
     required this.createdAt,
     required this.updatedAt,
   });
@@ -48,6 +52,8 @@ class SessionModel {
       recordingUrl: map['recording_url'] as String?,
       isRecorded: map['is_recorded'] as bool? ?? false,
       status: map['status'] as String? ?? 'scheduled',
+      recurringSessionId: map['recurring_session_id'] as String?, // NEW
+      isRecurringInstance: map['is_recurring_instance'] as bool? ?? false, // NEW
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -67,6 +73,8 @@ class SessionModel {
       'recording_url': recordingUrl,
       'is_recorded': isRecorded,
       'status': status,
+      'recurring_session_id': recurringSessionId, // NEW
+      'is_recurring_instance': isRecurringInstance, // NEW
     };
   }
 
@@ -84,6 +92,8 @@ class SessionModel {
     String? recordingUrl,
     bool? isRecorded,
     String? status,
+    String? recurringSessionId, // NEW
+    bool? isRecurringInstance, // NEW
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -101,6 +111,8 @@ class SessionModel {
       recordingUrl: recordingUrl ?? this.recordingUrl,
       isRecorded: isRecorded ?? this.isRecorded,
       status: status ?? this.status,
+      recurringSessionId: recurringSessionId ?? this.recurringSessionId, // NEW
+      isRecurringInstance: isRecurringInstance ?? this.isRecurringInstance, // NEW
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

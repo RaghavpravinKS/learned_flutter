@@ -313,14 +313,185 @@ class _SessionManagementScreenState extends ConsumerState<SessionManagementScree
   }
 
   void _editSession(SessionModel session) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => CreateSessionScreen(session: session)),
-    );
+    // Check if this is a recurring instance
+    if (session.isRecurringInstance && session.recurringSessionId != null) {
+      // Show dialog to choose edit option
+      final editOption = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Edit Recurring Session'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('This is part of a recurring series.', style: TextStyle(color: Colors.grey[700])),
+              const SizedBox(height: 16),
+              const Text('What would you like to edit?'),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context, 'this'), child: const Text('This Session Only')),
+            TextButton(onPressed: () => Navigator.pop(context, 'future'), child: const Text('All Future Sessions')),
+          ],
+        ),
+      );
 
-    if (result == true) {
-      // Refresh the list
-      ref.invalidate(teacherSessionsProvider);
+      if (editOption == null || !mounted) return;
+
+      if (editOption == 'this') {
+        // Edit this instance only - it will break from the series
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => CreateSessionScreen(session: session)),
+        );
+
+        if (result == true) {
+          ref.invalidate(teacherSessionsProvider);
+        }
+      } else if (editOption == 'future') {
+        // TODO: Implement edit all future sessions (Phase 6 enhancement)
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Edit all future sessions coming soon!')));
+        }
+      }
+    } else {
+      // Regular one-time session or already broken from series
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => CreateSessionScreen(session: session)),
+      );
+
+      if (result == true) {
+        ref.invalidate(teacherSessionsProvider);
+      }
+    }
+  }
+
+  void _deleteSession(SessionModel session) async {
+    // Check if this is a recurring instance
+    if (session.isRecurringInstance && session.recurringSessionId != null) {
+      // Show dialog to choose delete option
+      final deleteOption = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Recurring Session'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('This is part of a recurring series.', style: TextStyle(color: Colors.grey[700])),
+              const SizedBox(height: 16),
+              const Text('What would you like to delete?'),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'this'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('This Session Only'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'future'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('All Future Sessions'),
+            ),
+          ],
+        ),
+      );
+
+      if (deleteOption == null || !mounted) return;
+
+      // Confirm deletion
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: Text(
+            deleteOption == 'this'
+                ? 'Are you sure you want to delete this session?'
+                : 'Are you sure you want to delete all future sessions in this series?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true || !mounted) return;
+
+      try {
+        if (deleteOption == 'this') {
+          // Delete this instance only
+          await Supabase.instance.client.from('class_sessions').delete().eq('id', session.id);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session deleted successfully')));
+            ref.invalidate(teacherSessionsProvider);
+          }
+        } else if (deleteOption == 'future') {
+          // Delete all future sessions including this one
+          final recurringId = session.recurringSessionId;
+          if (recurringId != null) {
+            await Supabase.instance.client
+                .from('class_sessions')
+                .delete()
+                .eq('recurring_session_id', recurringId)
+                .gte('session_date', session.sessionDate.toIso8601String().split('T')[0]);
+
+            if (mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Future sessions deleted successfully')));
+              ref.invalidate(teacherSessionsProvider);
+            }
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting session: $e')));
+        }
+      }
+    } else {
+      // Regular one-time session
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Session'),
+          content: Text('Are you sure you want to delete "${session.title}"?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true && mounted) {
+        try {
+          await Supabase.instance.client.from('class_sessions').delete().eq('id', session.id);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session deleted successfully')));
+            ref.invalidate(teacherSessionsProvider);
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting session: $e')));
+          }
+        }
+      }
     }
   }
 
@@ -418,6 +589,46 @@ class _SessionManagementScreenState extends ConsumerState<SessionManagementScree
                   ),
                 ),
               ],
+
+              // Action buttons for upcoming sessions
+              if (isUpcoming) ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _editSession(session);
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _deleteSession(session);
+                        },
+                        icon: const Icon(Icons.delete),
+                        label: const Text('Delete'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -443,12 +654,25 @@ class _SessionManagementScreenState extends ConsumerState<SessionManagementScree
   }
 
   Future<void> _launchMeetingUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      final uri = Uri.parse(url);
+      print('🔗 Teacher launching meeting URL: $url');
+
+      // Use platformDefault for better compatibility
+      final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+
+      if (launched) {
+        print('✅ Meeting URL launched successfully');
+      } else {
+        print('❌ Failed to launch meeting URL');
+        throw 'Could not open meeting link';
+      }
+    } catch (e) {
+      print('❌ Error launching meeting URL: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open meeting link')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open meeting link: ${e.toString()}'), backgroundColor: Colors.red),
+        );
       }
     }
   }

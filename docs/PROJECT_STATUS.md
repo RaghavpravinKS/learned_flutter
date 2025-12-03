@@ -65,7 +65,7 @@
 
 | Module | Status | Details |
 |--------|---------|---------|
-| **Teacher Portal** | 🟡 75% | Session Management, Assignments, Grading, Attendance, Classroom Detail, Learning Materials complete. Profile management remaining. |
+| **Teacher Portal** | 🟡 85% | Session Management (with recurring sessions, edit/delete), Assignments, Grading, Attendance, Classroom Detail, Learning Materials complete. Profile management remaining. |
 | **Admin User Creation** | 🟡 95% | Trigger function verified, migration ready to apply |
 | **Video Call Integration** | 🟡 30% | UI complete, WebRTC integration pending |
 | **Payment Gateway** | 🟡 20% | Mock flow complete, real payment integration needed |
