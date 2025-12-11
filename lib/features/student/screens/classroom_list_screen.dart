@@ -20,6 +20,7 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
   // Student's grade and board - automatically detected from user profile
   String? _studentBoard;
   int? _studentGrade;
+  bool _isLoadingProfile = true;
 
   final List<String> _subjects = ['All', 'Mathematics', 'Physics', 'Chemistry', 'Biology'];
 
@@ -29,18 +30,46 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
     _loadStudentProfile();
   }
 
-  void _loadStudentProfile() {
+  Future<void> _loadStudentProfile() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user != null) {
-      setState(() {
-        _studentGrade = user.userMetadata?['grade_level'] as int?;
-        _studentBoard = user.userMetadata?['board'] as String?;
-      });
+      try {
+        // Fetch from students table (source of truth) instead of auth metadata
+        final studentData = await Supabase.instance.client
+            .from('students')
+            .select('grade_level, board')
+            .eq('user_id', user.id)
+            .single();
+        
+        if (mounted) {
+          setState(() {
+            _studentGrade = studentData['grade_level'] as int?;
+            _studentBoard = studentData['board'] as String?;
+            _isLoadingProfile = false;
+          });
+        }
 
-      print('📚 Student Profile Loaded:');
-      print('   Grade: $_studentGrade');
-      print('   Board: $_studentBoard');
-      print('   Filtering classrooms to match student\'s grade and board');
+        print('📚 Student Profile Loaded from DB:');
+        print('   Grade: $_studentGrade');
+        print('   Board: $_studentBoard');
+        print('   Filtering classrooms to match student\'s grade and board');
+      } catch (e) {
+        // Fallback to auth metadata if DB fetch fails
+        print('⚠️ Failed to load from DB, using auth metadata: $e');
+        if (mounted) {
+          setState(() {
+            _studentGrade = user.userMetadata?['grade_level'] as int?;
+            _studentBoard = user.userMetadata?['board'] as String?;
+            _isLoadingProfile = false;
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+      }
     }
   }
 

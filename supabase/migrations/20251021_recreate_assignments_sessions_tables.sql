@@ -12,7 +12,7 @@ DROP TABLE IF EXISTS public.class_sessions CASCADE;
 -- ============================================================
 CREATE TABLE public.assignments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  classroom_id text NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+  classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
   teacher_id uuid NOT NULL REFERENCES public.teachers(id) ON DELETE CASCADE,
   title varchar(255) NOT NULL,
   description text,
@@ -32,7 +32,7 @@ CREATE TABLE public.assignments (
 -- ============================================================
 CREATE TABLE public.class_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  classroom_id text NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+  classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
   title varchar(255) NOT NULL,
   description text,
   session_date date NOT NULL,

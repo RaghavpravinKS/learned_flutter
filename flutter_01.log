@@ -1,0 +1,99 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter build macos --debug
+
+## exception
+
+ProcessException: ProcessException: Process exited abnormally with exit code 72:
+xcrun: error: unable to find utility "xcodebuild", not a developer tool or in PATH
+  Command: /usr/bin/arch -arm64e xcrun xcodebuild -list -project Runner.xcodeproj
+
+```
+#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:118:5)
+#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:344:19)
+<asynchronous suspension>
+#2      XcodeProjectInterpreter.getInfo (package:flutter_tools/src/ios/xcodeproj.dart:328:30)
+<asynchronous suspension>
+#3      buildMacOS (package:flutter_tools/src/macos/build_macos.dart:127:41)
+<asynchronous suspension>
+#4      BuildMacosCommand.runCommand (package:flutter_tools/src/commands/build_macos.dart:60:5)
+<asynchronous suspension>
+#5      FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1581:27)
+<asynchronous suspension>
+#6      AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#7      CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#8      FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:503:9)
+<asynchronous suspension>
+#9      AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#10     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:438:5)
+<asynchronous suspension>
+#11     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:98:11)
+<asynchronous suspension>
+#12     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#13     main (package:flutter_tools/executable.dart:101:3)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.35.2, on macOS 26.1 25B78 darwin-arm64, locale en-IN) [860ms]
+    [32m•[39m Flutter version 3.35.2 on channel stable at /Users/pavandeekshith/fvm/versions/stable
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision 05db968908 (3 months ago), 2025-08-25 10:21:35 -0700
+    [32m•[39m Engine revision a8bfdfc394
+    [32m•[39m Dart version 3.9.0
+    [32m•[39m DevTools version 2.48.0
+    [32m•[39m Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop,
+      enable-android, enable-ios, cli-animations, enable-lldb-debugging
+
+[33m[!][39m Android toolchain - develop for Android devices (Android SDK version 34.0.0) [77.5s]
+    [32m•[39m Android SDK at /Users/pavandeekshith/Library/Android/sdk
+    [32m•[39m Emulator version 33.1.13.0 (build_id 10332831) (CL:N/A)
+    [32m•[39m Platform android-36, build-tools 34.0.0
+    [32m•[39m Java binary at: /Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home/bin/java
+      This JDK is specified by the JAVA_HOME environment variable.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    [32m•[39m Java version Java(TM) SE Runtime Environment (build 17.0.10+11-LTS-240)
+    [33m![39m Some Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses
+
+[33m[!][39m Xcode - develop for iOS and macOS [2.3s]
+    [31m✗[39m Xcode installation is incomplete; a full installation is necessary for iOS and macOS development.
+      Download at: https://developer.apple.com/xcode/
+      Or install Xcode via the App Store.
+      Once installed, run:
+        sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+        sudo xcodebuild -runFirstLaunch
+    [33m![39m CocoaPods 1.14.3 out of date (1.16.2 is recommended).
+        CocoaPods is a package manager for iOS or macOS platform code.
+        Without CocoaPods, plugins will not work on iOS or macOS.
+        For more info, see https://flutter.dev/to/platform-plugins
+      To update CocoaPods, see https://guides.cocoapods.org/using/getting-started.html#updating-cocoapods
+
+[31m[✗][39m Chrome - develop for the web (Cannot find Chrome executable at /Applications/Google
+    Chrome.app/Contents/MacOS/Google Chrome) [60ms]
+    [33m![39m Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+
+[33m[!][39m Android Studio (not installed) [59ms]
+    [32m•[39m Android Studio not found; download from https://developer.android.com/studio/index.html
+      (or visit https://flutter.dev/to/macos-android-setup for detailed instructions).
+
+[32m[✓][39m VS Code (version 1.106.2) [59ms]
+    [32m•[39m VS Code at /Applications/Visual Studio Code.app/Contents
+    [32m•[39m Flutter extension version 3.124.0
+
+[32m[✓][39m Connected device (1 available) [779ms]
+    [32m•[39m macOS (desktop) • macos • darwin-arm64 • macOS 26.1 25B78 darwin-arm64
+
+[32m[✓][39m Network resources [1,195ms]
+    [32m•[39m All expected network resources are available.
+
+[33m![39m Doctor found issues in 4 categories.
+```

@@ -96,7 +96,7 @@ CREATE TABLE public.payment_plans (
 
 -- Classrooms table
 CREATE TABLE public.classrooms (
-  id character varying NOT NULL,
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
   name character varying NOT NULL,
   description text,
   subject character varying NOT NULL,
@@ -115,7 +115,7 @@ CREATE TABLE public.classrooms (
 -- Classroom pricing table
 CREATE TABLE public.classroom_pricing (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   payment_plan_id character varying NOT NULL,
   price numeric NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
@@ -129,7 +129,7 @@ CREATE TABLE public.classroom_pricing (
 CREATE TABLE public.student_enrollments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   student_id uuid NOT NULL,
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   payment_plan_id character varying NOT NULL,
   status enrollment_status DEFAULT 'pending',
   enrollment_date timestamp with time zone DEFAULT now(),
@@ -151,7 +151,7 @@ CREATE TABLE public.student_enrollments (
 CREATE TABLE public.payments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   student_id uuid NOT NULL,
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   payment_plan_id character varying NOT NULL,
   amount numeric NOT NULL,
   currency character varying DEFAULT 'USD',
@@ -171,7 +171,7 @@ CREATE TABLE public.payments (
 -- Class sessions table
 CREATE TABLE public.class_sessions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   title character varying NOT NULL,
   description text,
   session_date date,
@@ -311,7 +311,7 @@ CREATE TABLE public.parent_student_relations (
 -- Assignments table
 CREATE TABLE public.assignments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   teacher_id uuid NOT NULL,
   title character varying NOT NULL,
   description text,
@@ -347,7 +347,7 @@ CREATE TABLE public.assignment_questions (
 CREATE TABLE public.learning_materials (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   teacher_id uuid NOT NULL,
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   title character varying NOT NULL,
   description text,
   material_type character varying NOT NULL CHECK (material_type::text = ANY (ARRAY['note'::character varying, 'video'::character varying, 'document'::character varying, 'presentation'::character varying, 'assignment'::character varying, 'recording'::character varying]::text[])),
@@ -411,7 +411,7 @@ CREATE TABLE public.student_assignment_attempts (
 CREATE TABLE public.student_progress (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   student_id uuid NOT NULL,
-  classroom_id character varying NOT NULL,
+  classroom_id uuid NOT NULL,
   assignment_id uuid,
   progress_type character varying NOT NULL CHECK (progress_type::text = ANY (ARRAY['assignment'::character varying, 'quiz'::character varying, 'test'::character varying, 'overall'::character varying]::text[])),
   score numeric,
@@ -534,7 +534,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Function: Enroll student with payment
 CREATE OR REPLACE FUNCTION enroll_student_with_payment(
     p_student_id uuid,
-    p_classroom_id text,
+    p_classroom_id uuid,
     p_payment_plan_id text,
     p_amount_paid numeric
 )
@@ -792,7 +792,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Function: Get student classrooms
 CREATE OR REPLACE FUNCTION get_student_classrooms(p_student_id uuid)
 RETURNS TABLE (
-    classroom_id text,
+    classroom_id uuid,
     classroom_name text,
     subject text,
     grade_level integer,
@@ -1335,7 +1335,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Function: Assign teacher to classroom
 CREATE OR REPLACE FUNCTION assign_teacher_to_classroom(
     p_admin_id uuid,
-    p_classroom_id text,
+    p_classroom_id uuid,
     p_teacher_id uuid
 )
 RETURNS jsonb AS $$

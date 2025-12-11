@@ -676,14 +676,30 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
   }
 
   Widget _buildStudentCard(Map<String, dynamic> studentData) {
-    final student = studentData['student'] as Map<String, dynamic>;
-    final user = student['users'] as Map<String, dynamic>;
+    // Safely extract nested data with null checks
+    final studentRaw = studentData['student'];
+    if (studentRaw == null) {
+      print('WARNING: studentData["student"] is null for enrollment: $studentData');
+      return const SizedBox.shrink(); // Skip this card
+    }
+    
+    final student = studentRaw as Map<String, dynamic>;
+    final userRaw = student['users'];
+    if (userRaw == null) {
+      print('WARNING: student["users"] is null for student: $student');
+      return const SizedBox.shrink(); // Skip this card
+    }
+    
+    final user = userRaw as Map<String, dynamic>;
     final firstName = user['first_name'] as String? ?? '';
     final lastName = user['last_name'] as String? ?? '';
-    final name = '$firstName $lastName'.trim();
-    final email = user['email'] as String;
+    final name = '$firstName $lastName'.trim().isEmpty ? 'Unknown Student' : '$firstName $lastName'.trim();
+    final email = user['email'] as String? ?? 'No email';
     final gradeLevel = student['grade_level'];
-    final enrollmentDate = DateTime.parse(studentData['enrollment_date'] as String);
+    final enrollmentDateStr = studentData['enrollment_date'] as String?;
+    final enrollmentDate = enrollmentDateStr != null 
+        ? DateTime.tryParse(enrollmentDateStr) ?? DateTime.now()
+        : DateTime.now();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -693,7 +709,7 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         leading: CircleAvatar(
           backgroundColor: AppColors.primary.withOpacity(0.2),
           child: Text(
-            name[0].toUpperCase(),
+            name.isNotEmpty ? name[0].toUpperCase() : '?',
             style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
           ),
         ),

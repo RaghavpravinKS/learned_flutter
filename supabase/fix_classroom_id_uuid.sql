@@ -1,15 +1,14 @@
--- Migration: Add detailed logging to enroll_student_with_payment function
--- Created: 2025-09-19
+-- =====================================================
+-- FIX: Update classroom_id parameter from TEXT to UUID
+-- Run this in Supabase SQL Editor
+-- =====================================================
 
--- Drop existing function first to avoid conflicts
-DROP FUNCTION IF EXISTS get_enrollment_logs(integer);
+-- Drop and recreate the enroll_student_with_payment function with UUID parameter
 DROP FUNCTION IF EXISTS enroll_student_with_payment(uuid, text, text, numeric);
 
--- First, let's modify the enroll_student_with_payment function to add comprehensive logging
--- Using the existing trigger_logs table structure: id, event_time, message, error_message, metadata
 CREATE OR REPLACE FUNCTION enroll_student_with_payment(
     p_student_id uuid,
-    p_classroom_id uuid,
+    p_classroom_id uuid,  -- CHANGED FROM text TO uuid
     p_payment_plan_id text,
     p_amount_paid numeric
 )
@@ -54,7 +53,7 @@ BEGIN
             'Student not found',
             jsonb_build_object('student_id', p_student_id, 'step', v_step)
         );
-        RETURN jsonb_build_object('success', false, 'error', 'Student not found');
+        RETURN jsonb_build_object('success', false, 'error', 'Student not found', 'step', v_step);
     END IF;
 
     INSERT INTO trigger_logs (message, metadata)
@@ -64,7 +63,7 @@ BEGIN
     );
 
     v_step := 'validating_classroom';
-    -- Validate classroom exists
+    -- Validate classroom exists (NOW USING UUID COMPARISON)
     SELECT * INTO v_classroom_record FROM classrooms WHERE id = p_classroom_id;
     IF NOT FOUND THEN
         INSERT INTO trigger_logs (message, error_message, metadata)
@@ -73,7 +72,7 @@ BEGIN
             'Classroom not found',
             jsonb_build_object('classroom_id', p_classroom_id, 'step', v_step)
         );
-        RETURN jsonb_build_object('success', false, 'error', 'Classroom not found');
+        RETURN jsonb_build_object('success', false, 'error', 'Classroom not found', 'step', v_step);
     END IF;
 
     INSERT INTO trigger_logs (message, metadata)
@@ -92,7 +91,7 @@ BEGIN
             'Payment plan not found',
             jsonb_build_object('payment_plan_id', p_payment_plan_id, 'step', v_step)
         );
-        RETURN jsonb_build_object('success', false, 'error', 'Payment plan not found');
+        RETURN jsonb_build_object('success', false, 'error', 'Payment plan not found', 'step', v_step);
     END IF;
 
     INSERT INTO trigger_logs (message, metadata)
@@ -110,7 +109,7 @@ BEGIN
             'Student already enrolled',
             jsonb_build_object('student_id', p_student_id, 'classroom_id', p_classroom_id, 'step', v_step)
         );
-        RETURN jsonb_build_object('success', false, 'error', 'Student already enrolled in this classroom');
+        RETURN jsonb_build_object('success', false, 'error', 'Student already enrolled in this classroom', 'step', v_step);
     END IF;
 
     INSERT INTO trigger_logs (message, metadata)
@@ -198,28 +197,34 @@ BEGIN
     );
 
     v_step := 'logging_audit_event';
-    -- Log audit event for enrollment
-    PERFORM log_audit_event(
-        p_user_id := (SELECT user_id FROM students WHERE id = p_student_id),
-        p_action_type := 'student_enrollment_created',
-        p_table_name := 'student_enrollments',
-        p_record_id := v_enrollment_id,
-        p_new_values := jsonb_build_object(
-            'student_id', p_student_id,
-            'classroom_id', p_classroom_id,
-            'payment_plan_id', p_payment_plan_id,
-            'amount_paid', p_amount_paid,
-            'end_date', v_end_date
-        ),
-        p_description := 'Student enrolled in classroom: ' || v_classroom_record.name,
-        p_severity := 'info',
-        p_tags := ARRAY['enrollment', 'payment', 'student'],
-        p_metadata := jsonb_build_object(
-            'payment_id', v_payment_id,
-            'billing_cycle', v_payment_plan_record.billing_cycle,
-            'classroom_name', v_classroom_record.name
-        )
-    );
+    -- Log audit event for enrollment (if function exists)
+    BEGIN
+        PERFORM log_audit_event(
+            p_user_id := (SELECT user_id FROM students WHERE id = p_student_id),
+            p_action_type := 'student_enrollment_created',
+            p_table_name := 'student_enrollments',
+            p_record_id := v_enrollment_id,
+            p_new_values := jsonb_build_object(
+                'student_id', p_student_id,
+                'classroom_id', p_classroom_id,
+                'payment_plan_id', p_payment_plan_id,
+                'amount_paid', p_amount_paid,
+                'end_date', v_end_date
+            ),
+            p_description := 'Student enrolled in classroom: ' || v_classroom_record.name,
+            p_severity := 'info',
+            p_tags := ARRAY['enrollment', 'payment', 'student'],
+            p_metadata := jsonb_build_object(
+                'payment_id', v_payment_id,
+                'billing_cycle', v_payment_plan_record.billing_cycle,
+                'classroom_name', v_classroom_record.name
+            )
+        );
+    EXCEPTION
+        WHEN undefined_function THEN
+            -- Ignore if log_audit_event doesn't exist
+            NULL;
+    END;
 
     INSERT INTO trigger_logs (message, metadata)
     VALUES (
@@ -264,28 +269,9 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Helper function to easily query enrollment logs
-CREATE OR REPLACE FUNCTION get_enrollment_logs(
-    p_limit integer DEFAULT 50
-)
-RETURNS TABLE (
-    id integer,
-    event_time timestamp with time zone,
-    message text,
-    error_message text,
-    metadata jsonb
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        tl.id,
-        tl.event_time,
-        tl.message,
-        tl.error_message,
-        tl.metadata
-    FROM trigger_logs tl
-    WHERE tl.message ILIKE '%enrollment%' OR tl.error_message ILIKE '%enrollment%'
-    ORDER BY tl.event_time DESC
-    LIMIT p_limit;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Verify the function was created
+SELECT 
+    proname as function_name,
+    pg_get_function_arguments(oid) as arguments
+FROM pg_proc 
+WHERE proname = 'enroll_student_with_payment';
