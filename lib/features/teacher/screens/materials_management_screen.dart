@@ -63,7 +63,6 @@ class _MaterialsManagementScreenState extends State<MaterialsManagementScreen> {
         _classrooms = classrooms;
       });
     } catch (e) {
-      print('Error loading classrooms: $e');
       rethrow;
     }
   }
@@ -91,7 +90,6 @@ class _MaterialsManagementScreenState extends State<MaterialsManagementScreen> {
         _materials = materials;
       });
     } catch (e) {
-      print('Error loading materials: $e');
       rethrow;
     }
   }

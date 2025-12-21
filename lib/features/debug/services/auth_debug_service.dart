@@ -113,84 +113,9 @@ class AuthDebugService {
     }
   }
 
-  /// Print comprehensive auth debug info to console
+  /// Print comprehensive auth debug info to console (disabled in production)
   Future<void> printAuthDebugInfo() async {
-    print('\n🔍 ==================== AUTH DEBUG INFO ====================');
-
-    final debugInfo = await getAuthDebugInfo();
-
-    // Session Info
-    print('📱 SESSION:');
-    print('   Exists: ${debugInfo['session_exists']}');
-    if (debugInfo['session_info'] != null) {
-      final sessionInfo = debugInfo['session_info'] as Map<String, dynamic>;
-      print('   Access Token: ${sessionInfo['access_token_exists'] ? 'Present' : 'Missing'}');
-      print('   Refresh Token: ${sessionInfo['refresh_token_exists'] ? 'Present' : 'Missing'}');
-      print('   Expires At: ${sessionInfo['expires_at']}');
-      print('   Is Expired: ${sessionInfo['is_expired']}');
-    }
-
-    // User Info
-    print('\n👤 USER:');
-    print('   Exists: ${debugInfo['user_exists']}');
-    if (debugInfo['user_info'] != null) {
-      final userInfo = debugInfo['user_info'] as Map<String, dynamic>;
-      print('   ID: ${userInfo['id']}');
-      print('   Email: ${userInfo['email']}');
-      print('   Email Confirmed: ${userInfo['email_confirmed_at'] != null}');
-      print('   Created: ${userInfo['created_at']}');
-      print('   Last Sign In: ${userInfo['last_sign_in_at']}');
-    }
-
-    // Metadata
-    if (debugInfo['user_metadata'] != null) {
-      print('\n📋 USER METADATA:');
-      final metadata = debugInfo['user_metadata'] as Map<String, dynamic>;
-      metadata.forEach((key, value) {
-        print('   $key: $value');
-      });
-    }
-
-    // Database Records
-    print('\n💾 DATABASE RECORDS:');
-    print('   User in DB: ${debugInfo['user_in_database']}');
-    if (debugInfo['user_database_record'] != null) {
-      final dbUser = debugInfo['user_database_record'] as Map<String, dynamic>;
-      print('   DB User Type: ${dbUser['user_type']}');
-      print('   DB User Name: ${dbUser['first_name']} ${dbUser['last_name']}');
-    }
-
-    print('   Student Record: ${debugInfo['student_record_exists']}');
-    if (debugInfo['student_record'] != null) {
-      final student = debugInfo['student_record'] as Map<String, dynamic>;
-      print('   Student ID (UUID): ${student['id']}');
-      print('   Student ID (Code): ${student['student_id']}');
-      print('   Grade Level: ${student['grade_level']}');
-      print('   School: ${student['school_name']}');
-      print('   Status: ${student['status']}');
-    }
-
-    // Local Storage
-    print('\n💿 LOCAL PERSISTENCE:');
-    final storageInfo = debugInfo['local_storage_info'] as Map<String, dynamic>;
-    print('   Session Persisted: ${storageInfo['session_persisted']}');
-    print('   Note: ${storageInfo['note']}');
-
-    // Errors
-    if (debugInfo['error'] != null) {
-      print('\n❌ ERRORS:');
-      print('   ${debugInfo['error']}');
-    }
-
-    if (debugInfo['user_database_error'] != null) {
-      print('   User DB Error: ${debugInfo['user_database_error']}');
-    }
-
-    if (debugInfo['student_record_error'] != null) {
-      print('   Student Record Error: ${debugInfo['student_record_error']}');
-    }
-
-    print('🔍 ========================================================\n');
+    // Debug prints removed for production - use getAuthDebugInfo() to get data programmatically
   }
 
   /// Quick check if user is properly authenticated with student record
@@ -215,12 +140,9 @@ class AuthDebugService {
   /// Force refresh the current session
   Future<void> refreshSession() async {
     try {
-      print('🔄 Refreshing authentication session...');
-      final response = await _supabase.auth.refreshSession();
-      print('✅ Session refreshed successfully');
-      print('   New expires at: ${response.session?.expiresAt}');
+      await _supabase.auth.refreshSession();
     } catch (e) {
-      print('❌ Failed to refresh session: $e');
+      // Failed to refresh session
     }
   }
 }

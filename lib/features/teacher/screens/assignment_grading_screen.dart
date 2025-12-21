@@ -99,7 +99,6 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
         _submissions = submissions;
       });
     } catch (e) {
-      print('Error loading submissions: $e');
       rethrow;
     }
   }
@@ -127,7 +126,6 @@ class _AssignmentGradingScreenState extends State<AssignmentGradingScreen> with 
         _enrolledStudents = List<Map<String, dynamic>>.from(response as List);
       });
     } catch (e) {
-      print('Error loading enrolled students: $e');
       rethrow;
     }
   }
@@ -581,7 +579,6 @@ class _GradingScreenState extends State<_GradingScreen> {
         if (fileUrl != null && fileUrl.contains('assignment-attachments/')) {
           final extractedPath = fileUrl.split('assignment-attachments/').last;
           final decodedPath = Uri.decodeComponent(extractedPath);
-          print('DEBUG: Extracted storage path from URL: $decodedPath');
 
           await _openFileWithPath(decodedPath);
           return;
@@ -595,10 +592,8 @@ class _GradingScreenState extends State<_GradingScreen> {
         return;
       }
 
-      print('DEBUG: Storage path from answers: $storagePath');
       await _openFileWithPath(storagePath);
     } catch (e) {
-      print('DEBUG: Error opening file: $e');
       if (mounted) {
         String errorMessage = 'Error opening file: $e';
 
@@ -623,20 +618,17 @@ class _GradingScreenState extends State<_GradingScreen> {
     try {
       final supabase = Supabase.instance.client;
 
-      print('DEBUG: Creating signed URL for: $storagePath');
 
       // Generate signed URL from Supabase storage
       final signedUrl = await supabase.storage
           .from('assignment-attachments')
           .createSignedUrl(storagePath, 3600); // Valid for 1 hour
 
-      print('DEBUG: Generated signed URL: $signedUrl');
 
       // Launch the signed URL directly (canLaunchUrl returns false for storage URLs on Android)
       final uri = Uri.parse(signedUrl);
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      print('DEBUG: Error opening file: $e');
       rethrow;
     }
   }

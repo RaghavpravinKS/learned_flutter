@@ -47,7 +47,6 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
       try {
         _selectedDateOfBirth = DateTime.parse(userInfo['date_of_birth']);
       } catch (e) {
-        print('Error parsing date of birth: $e');
       }
     }
   }

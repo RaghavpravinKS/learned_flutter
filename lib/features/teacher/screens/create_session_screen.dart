@@ -1095,12 +1095,6 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
     final totalHours = hoursPerSession * sessionsPerWeek * totalWeeks;
     final monthlyHours = (totalHours * 30.0) / effectiveDuration;
 
-    print('📊 Client-side validation:');
-    print('   Hours per session: ${hoursPerSession.toStringAsFixed(2)}');
-    print('   Sessions per week: $sessionsPerWeek');
-    print('   Duration: $effectiveDuration days');
-    print('   Calculated monthly hours: ${monthlyHours.toStringAsFixed(2)}');
-    print('   Minimum required: ${minimumRequired.toStringAsFixed(2)}');
 
     // VALIDATE: Check if hours meet minimum requirement
     if (minimumRequired > 0 && monthlyHours < minimumRequired) {
@@ -1108,10 +1102,6 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
       final shortfall = minimumRequired - monthlyHours;
       final percentageShort = (shortfall / minimumRequired * 100).toStringAsFixed(0);
 
-      print('❌ Validation failed: Insufficient hours');
-      print('   Required: ${minimumRequired.toStringAsFixed(1)} hrs/month');
-      print('   Calculated: ${monthlyHours.toStringAsFixed(1)} hrs/month');
-      print('   Shortfall: ${shortfall.toStringAsFixed(1)} hrs ($percentageShort% short)');
 
       await showDialog(
         context: context,
@@ -1174,7 +1164,6 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
       return; // Stop here - don't proceed to backend
     }
 
-    print('✅ Client-side validation passed! Proceeding with session creation...');
 
     // ALL VALIDATIONS PASSED - Now proceed with backend save
     setState(() => _isSaving = true);
@@ -1183,7 +1172,6 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
       final teacherService = TeacherService();
 
       // Validation successful - now create the recurring session
-      print('🔄 Starting recurring session creation...');
       final supabase = Supabase.instance.client;
 
       // Determine start and end times for the recurring session template
@@ -1191,20 +1179,14 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
       TimeOfDay templateEndTime;
 
       if (_useDifferentTimes) {
-        print('📅 Using different times for each day');
         // Use the times from the first selected day as template
         final firstDay = _selectedDays.first;
         templateStartTime = _perDayStartTimes[firstDay]!;
         templateEndTime = _perDayEndTimes[firstDay]!;
-        print(
-          '   First day: $firstDay, Start: ${templateStartTime.format(context)}, End: ${templateEndTime.format(context)}',
-        );
       } else {
-        print('📅 Using global times');
         // Use global times
         templateStartTime = _recurringStartTime!;
         templateEndTime = _recurringEndTime!;
-        print('   Start: ${templateStartTime.format(context)}, End: ${templateEndTime.format(context)}');
       }
 
       // Create recurring session model
@@ -1228,37 +1210,23 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
         updatedAt: DateTime.now(),
       );
 
-      print('📝 Recurring session details:');
-      print('   Classroom ID: ${_recurringClassroomId}');
-      print('   Title: ${_titleController.text.trim()}');
-      print('   Recurrence days: ${_selectedDays.toList()..sort()}');
-      print('   Start date: ${_recurringStartDate}');
-      print('   End date: ${_hasEndDate ? _recurringEndDate : 'Ongoing'}');
-      print('   Meeting URL: ${_meetingUrlController.text.trim()}');
 
       // Create recurring session in database
-      print('💾 Creating recurring session in database...');
       final recurringSessionId = await teacherService.createRecurringSession(recurringSession);
-      print('✅ Recurring session created with ID: $recurringSessionId');
 
       int generatedCount = 0;
 
       // If using different times per day, generate instances manually
       if (_useDifferentTimes) {
-        print('🔧 Generating instances with custom times...');
         generatedCount = await _generateInstancesWithCustomTimes(supabase, recurringSessionId, _recurringClassroomId!);
-        print('✅ Generated $generatedCount instances with custom times');
       } else {
-        print('🔧 Generating instances using standard function (${_monthsAhead} months ahead)...');
         // Use standard generation function
         generatedCount = await teacherService.generateSessionInstances(
           recurringSessionId: recurringSessionId,
           monthsAhead: _monthsAhead,
         );
-        print('✅ Generated $generatedCount instances');
       }
 
-      print('🎉 Recurring session creation complete!');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1267,8 +1235,6 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> with 
         Navigator.pop(context, true); // Return true to indicate success
       }
     } catch (e, stackTrace) {
-      print('❌ Error creating recurring session: $e');
-      print('Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creating recurring session: $e')));
       }

@@ -9,18 +9,15 @@ class SessionRepository {
   // Get upcoming classes for a student
   Future<List<SessionModel>> getUpcomingSessions(String userId) async {
     try {
-      print('=== Fetching upcoming sessions for user: $userId ===');
 
       // Get student ID
       final studentResponse = await _supabaseClient.from('students').select('id').eq('user_id', userId).maybeSingle();
 
       if (studentResponse == null) {
-        print('=== No student record found ===');
         return [];
       }
 
       final studentId = studentResponse['id'] as String;
-      print('=== Student ID: $studentId ===');
 
       // Get enrolled classroom IDs
       final enrollmentsResponse = await _supabaseClient
@@ -29,13 +26,11 @@ class SessionRepository {
           .eq('student_id', studentId);
 
       if (enrollmentsResponse.isEmpty) {
-        print('=== No enrollments found ===');
         return [];
       }
 
       final classroomIds = (enrollmentsResponse as List).map((item) => item['classroom_id'] as String).toList();
 
-      print('=== Found ${classroomIds.length} enrolled classrooms ===');
 
       // Get current date and time
       final now = DateTime.now();
@@ -51,7 +46,6 @@ class SessionRepository {
           .order('start_time', ascending: true)
           .limit(10);
 
-      print('=== Found ${response.length} upcoming sessions ===');
 
       // Fetch classroom and teacher details for each session
       final sessions = <SessionModel>[];
@@ -126,11 +120,8 @@ class SessionRepository {
         sessions.add(SessionModel.fromMap(sessionMap));
       }
 
-      print('=== Successfully processed ${sessions.length} sessions ===');
       return sessions;
     } catch (e, stackTrace) {
-      print('=== Error fetching upcoming sessions: $e ===');
-      print('=== Stack trace: $stackTrace ===');
       rethrow;
     }
   }
@@ -144,7 +135,6 @@ class SessionRepository {
         'joined_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      print('Error joining session: $e');
       rethrow;
     }
   }

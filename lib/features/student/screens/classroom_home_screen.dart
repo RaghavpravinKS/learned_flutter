@@ -920,9 +920,6 @@ class ClassroomHomeScreen extends ConsumerWidget {
     }
 
     try {
-      print('=== Attempting to view material: ${material.title} ===');
-      print('=== Stored File URL: ${material.fileUrl} ===');
-      print('=== Material type: ${material.materialType} ===');
 
       // Extract the file path from the stored URL
       // The URL might be in format: https://[project].supabase.co/storage/v1/object/public/learning-materials/[path]
@@ -932,9 +929,7 @@ class ClassroomHomeScreen extends ConsumerWidget {
 
       if (storedUrl.contains('learning-materials/')) {
         filePath = storedUrl.split('learning-materials/').last;
-        print('=== Extracted file path: $filePath ===');
       } else {
-        print('=== Could not extract file path from URL, using stored URL directly ===');
         filePath = null;
       }
 
@@ -949,10 +944,8 @@ class ClassroomHomeScreen extends ConsumerWidget {
               .from('learning-materials')
               .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-          print('=== Generated signed URL: $signedUrl ===');
           uri = Uri.parse(signedUrl);
         } catch (e) {
-          print('=== Error creating signed URL: $e, falling back to stored URL ===');
           uri = Uri.parse(storedUrl);
         }
       } else {
@@ -963,7 +956,6 @@ class ClassroomHomeScreen extends ConsumerWidget {
       final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
 
       if (!launched) {
-        print('=== Failed to launch URL in browser view ===');
         // Try external application as fallback
         final launchedExternal = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
@@ -971,10 +963,8 @@ class ClassroomHomeScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open file')));
         }
       } else {
-        print('=== Successfully opened material in browser view ===');
       }
     } catch (e) {
-      print('=== Error viewing material: $e ===');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening file: $e')));
       }
@@ -990,8 +980,6 @@ class ClassroomHomeScreen extends ConsumerWidget {
     }
 
     try {
-      print('=== Attempting to download material: ${material.title} ===');
-      print('=== Stored File URL: ${material.fileUrl} ===');
 
       // Extract the file path from the stored URL
       String? filePath;
@@ -999,9 +987,7 @@ class ClassroomHomeScreen extends ConsumerWidget {
 
       if (storedUrl.contains('learning-materials/')) {
         filePath = storedUrl.split('learning-materials/').last;
-        print('=== Extracted file path: $filePath ===');
       } else {
-        print('=== Could not extract file path from URL, using stored URL directly ===');
         filePath = null;
       }
 
@@ -1013,10 +999,8 @@ class ClassroomHomeScreen extends ConsumerWidget {
           final supabase = Supabase.instance.client;
           final signedUrl = await supabase.storage.from('learning-materials').createSignedUrl(filePath, 3600);
 
-          print('=== Generated signed URL for download: $signedUrl ===');
           uri = Uri.parse(signedUrl);
         } catch (e) {
-          print('=== Error creating signed URL: $e, falling back to stored URL ===');
           uri = Uri.parse(storedUrl);
         }
       } else {
@@ -1027,18 +1011,15 @@ class ClassroomHomeScreen extends ConsumerWidget {
       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
       if (launched) {
-        print('=== Download initiated successfully ===');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Downloading ${material.title}...')));
         }
       } else {
-        print('=== Failed to initiate download ===');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not start download')));
         }
       }
     } catch (e) {
-      print('=== Error downloading material: $e ===');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error downloading file: $e')));
       }

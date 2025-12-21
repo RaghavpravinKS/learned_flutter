@@ -40,9 +40,7 @@ class AuthService {
       // - Invalidating refresh tokens
       // - Triggering auth state change listeners
 
-      print('🔍 AuthService: User signed out successfully');
     } catch (e) {
-      print('🔍 AuthService: Error during sign out: $e');
       rethrow;
     }
   }

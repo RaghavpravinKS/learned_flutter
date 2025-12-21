@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../models/session_model.dart';
@@ -102,7 +103,6 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         _classroom = response;
       });
     } catch (e) {
-      print('Error loading classroom: $e');
       rethrow;
     }
   }
@@ -137,24 +137,14 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         _totalEnrolled = _students.length;
       });
     } catch (e) {
-      print('Error loading students: $e');
       rethrow;
     }
   }
 
   Future<void> _loadUpcomingSessions() async {
     try {
-      // Debug: Check authentication and session
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      final session = Supabase.instance.client.auth.currentSession;
-      print('DEBUG _loadUpcomingSessions: User ID = ${currentUser?.id}');
-      print('DEBUG _loadUpcomingSessions: User email = ${currentUser?.email}');
-      print('DEBUG _loadUpcomingSessions: Session exists = ${session != null}');
-      print('DEBUG _loadUpcomingSessions: Access token exists = ${session?.accessToken != null}');
-
       // Try refreshing the session before query
       await Supabase.instance.client.auth.refreshSession();
-      print('DEBUG: Session refreshed');
 
       final now = DateTime.now();
       final response = await Supabase.instance.client
@@ -175,10 +165,8 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         _upcomingSessions = sessions;
       });
     } catch (e) {
-      print('Error loading sessions: $e');
       // Don't rethrow if it's just empty data - set empty list
       if (e.toString().contains('permission denied')) {
-        print('Note: This might just mean there are no sessions in the database yet');
         setState(() {
           _upcomingSessions = [];
         });
@@ -190,14 +178,8 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
 
   Future<void> _loadActiveAssignments() async {
     try {
-      // Debug: Check authentication
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      print('DEBUG _loadActiveAssignments: User ID = ${currentUser?.id}');
-      print('DEBUG _loadActiveAssignments: User email = ${currentUser?.email}');
-
       // Try refreshing the session before query
       await Supabase.instance.client.auth.refreshSession();
-      print('DEBUG: Session refreshed for assignments');
 
       final now = DateTime.now();
       final response = await Supabase.instance.client
@@ -217,10 +199,8 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         _activeAssignments = assignments;
       });
     } catch (e) {
-      print('Error loading assignments: $e');
       // Don't rethrow if it's just empty data - set empty list
       if (e.toString().contains('permission denied')) {
-        print('Note: This might just mean there are no assignments in the database yet');
         setState(() {
           _activeAssignments = [];
         });
@@ -239,7 +219,6 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         _averageGrade = 0.0;
       });
     } catch (e) {
-      print('Error loading statistics: $e');
       // Don't rethrow, statistics are optional
     }
   }
@@ -679,14 +658,12 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
     // Safely extract nested data with null checks
     final studentRaw = studentData['student'];
     if (studentRaw == null) {
-      print('WARNING: studentData["student"] is null for enrollment: $studentData');
       return const SizedBox.shrink(); // Skip this card
     }
     
     final student = studentRaw as Map<String, dynamic>;
     final userRaw = student['users'];
     if (userRaw == null) {
-      print('WARNING: student["users"] is null for student: $student');
       return const SizedBox.shrink(); // Skip this card
     }
     
@@ -1003,52 +980,60 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          backgroundColor: iconColor.withOpacity(0.1),
-          child: Icon(icon, color: iconColor),
-        ),
-        title: Text(
-          fileName,
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text('Size: $fileSize', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-            Text(
-              'Uploaded: ${DateFormat('MMM dd, yyyy').format(uploadedAt)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-            if (isPublic)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-                child: Text(
-                  'Public',
-                  style: TextStyle(fontSize: 10, color: Colors.green[700], fontWeight: FontWeight.w600),
+      child: InkWell(
+        onTap: () => _viewMaterial(material),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: iconColor.withOpacity(0.1),
+                child: Icon(icon, color: iconColor),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fileName,
+                      style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Size: $fileSize', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    Text(
+                      'Uploaded: ${DateFormat('MMM dd, yyyy').format(uploadedAt)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    if (isPublic)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                        child: Text(
+                          'Public',
+                          style: TextStyle(fontSize: 10, color: Colors.green[700], fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-          ],
-        ),
-        trailing: PopupMenuButton(
-          icon: const Icon(Icons.more_vert),
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'download', child: Text('Download')),
-            const PopupMenuItem(value: 'delete', child: Text('Delete'), enabled: true),
-          ],
-          onSelected: (value) {
-            if (value == 'download') {
-              _downloadMaterial(material);
-            } else if (value == 'delete') {
-              _confirmDeleteMaterial(material);
-            }
-          },
+              PopupMenuButton(
+                icon: const Icon(Icons.more_vert),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _confirmDeleteMaterial(material);
+                  }
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1056,8 +1041,6 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
 
   Future<void> _loadMaterials() async {
     try {
-      print('=== LOADING MATERIALS ===');
-      print('Classroom ID: ${widget.classroomId}');
 
       final response = await Supabase.instance.client
           .from('learning_materials')
@@ -1065,37 +1048,25 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
           .eq('classroom_id', widget.classroomId)
           .order('created_at', ascending: false);
 
-      print('Materials query response: $response');
-      print('Response type: ${response.runtimeType}');
-      print('Response length: ${(response as List).length}');
 
       setState(() {
         _materials = List<Map<String, dynamic>>.from(response);
-        print('Materials loaded: ${_materials.length} items');
       });
     } catch (e, stackTrace) {
-      print('Error loading materials: $e');
-      print('Stack trace: $stackTrace');
     }
   }
 
   Future<void> _uploadMaterial() async {
     try {
-      print('=== MATERIALS UPLOAD DEBUG START ===');
 
       // Pick file
-      print('Step 1: Opening file picker...');
       final result = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: false);
 
       if (result == null || result.files.isEmpty) {
-        print('File picker cancelled or no file selected');
         return;
       }
 
       final file = result.files.first;
-      print('Step 2: File selected - Name: ${file.name}, Size: ${file.size} bytes');
-      print('File extension: ${file.extension}');
-      print('Has bytes: ${file.bytes != null}, Has path: ${file.path != null}');
 
       if (file.bytes == null && file.path == null) {
         throw Exception('No file data available');
@@ -1104,16 +1075,11 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
       setState(() => _isUploadingMaterial = true);
 
       // Get teacher ID
-      print('Step 3: Getting current user...');
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) {
-        print('ERROR: User not authenticated');
         throw Exception('Not authenticated');
       }
-      print('User ID: ${user.id}');
-      print('User email: ${user.email}');
 
-      print('Step 4: Fetching teacher record...');
       final teacherResponse = await Supabase.instance.client
           .from('teachers')
           .select('id')
@@ -1121,61 +1087,39 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
           .single();
 
       final teacherId = teacherResponse['id'] as String;
-      print('Teacher ID: $teacherId');
-      print('Classroom ID: ${widget.classroomId}');
 
       // Verify the teacher owns this classroom (for debugging policy)
-      print('Step 4.5: Verifying teacher owns classroom...');
       final classroomCheck = await Supabase.instance.client
           .from('classrooms')
           .select('id, teacher_id, name')
           .eq('id', widget.classroomId)
           .maybeSingle();
 
-      print('Classroom check result: $classroomCheck');
       if (classroomCheck != null) {
-        print('Classroom exists: ${classroomCheck['name']}');
-        print('Classroom teacher_id: ${classroomCheck['teacher_id']}');
-        print('Current teacher_id: $teacherId');
-        print('Teacher owns classroom: ${classroomCheck['teacher_id'] == teacherId}');
       } else {
-        print('WARNING: Classroom not found!');
       }
 
       // Upload to Supabase Storage
       final filePath = 'classrooms/${widget.classroomId}/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-      print('Step 5: Uploading to storage...');
-      print('Bucket: learning-materials');
-      print('File path: $filePath');
 
       try {
         if (file.bytes != null) {
-          print('Uploading using bytes (${file.bytes!.length} bytes)...');
           await Supabase.instance.client.storage
               .from('learning-materials')
               .uploadBinary(filePath, file.bytes!, fileOptions: FileOptions(contentType: file.extension));
         } else if (file.path != null) {
-          print('Uploading using file path: ${file.path}');
           await Supabase.instance.client.storage.from('learning-materials').upload(filePath, File(file.path!));
         }
-        print('Storage upload successful!');
       } catch (storageError) {
-        print('STORAGE ERROR: $storageError');
-        print('Error type: ${storageError.runtimeType}');
         if (storageError is StorageException) {
-          print('Storage error message: ${storageError.message}');
-          print('Storage error statusCode: ${storageError.statusCode}');
         }
         rethrow;
       }
 
       // Get public URL
-      print('Step 6: Getting public URL...');
       final fileUrl = Supabase.instance.client.storage.from('learning-materials').getPublicUrl(filePath);
-      print('File URL: $fileUrl');
 
       // Save to database
-      print('Step 7: Saving to database...');
 
       // Determine material type from file extension
       String materialType = 'document'; // default
@@ -1204,17 +1148,12 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
-      print('Material data: $materialData');
 
       await Supabase.instance.client.from('learning_materials').insert(materialData);
-      print('Database insert successful!');
 
       // Reload materials
-      print('Step 8: Reloading materials list...');
       await _loadMaterials();
-      print('Materials reloaded - Count: ${_materials.length}');
 
-      print('=== MATERIALS UPLOAD DEBUG END - SUCCESS ===');
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -1222,22 +1161,9 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         ).showSnackBar(const SnackBar(content: Text('Material uploaded successfully!'), backgroundColor: Colors.green));
       }
     } catch (e, stackTrace) {
-      print('=== MATERIALS UPLOAD ERROR ===');
-      print('Error: $e');
-      print('Error type: ${e.runtimeType}');
-      print('Stack trace: $stackTrace');
 
       if (e is StorageException) {
-        print('StorageException details:');
-        print('  Message: ${e.message}');
-        print('  StatusCode: ${e.statusCode}');
-        print('  Error: ${e.error}');
       } else if (e is PostgrestException) {
-        print('PostgrestException details:');
-        print('  Message: ${e.message}');
-        print('  Code: ${e.code}');
-        print('  Details: ${e.details}');
-        print('  Hint: ${e.hint}');
       }
 
       if (mounted) {
@@ -1286,7 +1212,6 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         final bucketIndex = pathSegments.indexOf('learning-materials');
         if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
           final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
-          print('Deleting file from storage: $filePath');
           await Supabase.instance.client.storage.from('learning-materials').remove([filePath]);
         }
       }
@@ -1303,7 +1228,6 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
         ).showSnackBar(const SnackBar(content: Text('Material deleted successfully!'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      print('Error deleting material: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -1312,16 +1236,54 @@ class _ClassroomDetailScreenState extends State<ClassroomDetailScreen> with Sing
     }
   }
 
-  void _downloadMaterial(Map<String, dynamic> material) {
-    final fileUrl = material['file_url'] as String?;
-    if (fileUrl != null) {
+  Future<void> _viewMaterial(Map<String, dynamic> material) async {
+    final storedUrl = material['file_url'] as String?;
+    if (storedUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Download link copied to clipboard'),
-          action: SnackBarAction(label: 'OK', onPressed: () {}),
-        ),
+        const SnackBar(content: Text('File URL not available'), backgroundColor: Colors.orange),
       );
-      // In a real app, you would open the URL or download the file
+      return;
+    }
+
+    try {
+      
+      String? filePath;
+      if (storedUrl.contains('learning-materials/')) {
+        filePath = storedUrl.split('learning-materials/').last;
+      }
+
+      Uri uri;
+      if (filePath != null) {
+        try {
+          // Create a signed URL for secure access
+          final signedUrl = await Supabase.instance.client.storage
+              .from('learning-materials')
+              .createSignedUrl(filePath, 3600);
+          uri = Uri.parse(signedUrl);
+        } catch (e) {
+          uri = Uri.parse(storedUrl);
+        }
+      } else {
+        uri = Uri.parse(storedUrl);
+      }
+
+      // Try in-app browser first, then external
+      var launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      if (!launched && mounted) {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the file'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening file: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 

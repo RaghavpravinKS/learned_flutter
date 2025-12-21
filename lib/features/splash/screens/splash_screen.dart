@@ -37,11 +37,6 @@ class _SplashScreenState extends State<SplashScreen> {
     final session = Supabase.instance.client.auth.currentSession;
 
     // Debug print to see authentication state
-    print('🔍 Splash: Checking authentication...');
-    print('🔍 Splash: User exists: ${user != null}');
-    print('🔍 Splash: Session exists: ${session != null}');
-    print('🔍 Splash: User ID: ${user?.id}');
-    print('🔍 Splash: Session expires at: ${session?.expiresAt}');
 
     if (user != null && session != null) {
       // In debug mode, print current user info and try to fix user type
@@ -53,7 +48,6 @@ class _SplashScreenState extends State<SplashScreen> {
       // User is authenticated, determine user type
       String userType = await _determineUserType(user);
 
-      print('🔍 Splash: User authenticated as $userType, navigating to dashboard');
       setState(() {
         _statusText = 'Welcome back!';
       });
@@ -67,7 +61,6 @@ class _SplashScreenState extends State<SplashScreen> {
       }
     } else {
       // User not authenticated, go to welcome screen
-      print('🔍 Splash: User not authenticated, navigating to welcome');
       setState(() {
         _statusText = 'Welcome to LearnED';
       });
@@ -80,11 +73,9 @@ class _SplashScreenState extends State<SplashScreen> {
     // First, check user metadata
     final metadataUserType = user.userMetadata?['user_type'];
     if (metadataUserType != null) {
-      print('🔍 Splash: Found user_type in metadata: $metadataUserType');
       return metadataUserType;
     }
 
-    print('🔍 Splash: No user_type in metadata, checking database...');
 
     // Fallback: Check database tables to determine user type
     try {
@@ -96,7 +87,6 @@ class _SplashScreenState extends State<SplashScreen> {
           .maybeSingle();
 
       if (teacherResponse != null) {
-        print('🔍 Splash: Found user in teachers table');
         return 'teacher';
       }
 
@@ -108,14 +98,11 @@ class _SplashScreenState extends State<SplashScreen> {
           .maybeSingle();
 
       if (studentResponse != null) {
-        print('🔍 Splash: Found user in students table');
         return 'student';
       }
 
-      print('🔍 Splash: User not found in any specific table, defaulting to student');
       return 'student';
     } catch (e) {
-      print('🔍 Splash: Error checking database for user type: $e');
       return 'student'; // Default to student on error
     }
   }

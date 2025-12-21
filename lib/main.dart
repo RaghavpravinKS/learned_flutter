@@ -26,12 +26,6 @@ final authStateProvider = StreamProvider<User?>((ref) {
 });
 
 void main() async {
-  // Debug print environment variables
-  print('Supabase URL from env: ${Environment.supabaseUrl}');
-  print(
-    'Supabase Anon Key from env: ${Environment.supabaseAnonKey.isNotEmpty ? '***${Environment.supabaseAnonKey.substring(Environment.supabaseAnonKey.length - 4)}' : 'NOT SET'}',
-  );
-
   // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -46,11 +40,8 @@ void main() async {
       authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
     );
 
-    print('Supabase initialized successfully');
-
     runApp(const ProviderScope(child: LearnEDApp()));
   } catch (e) {
-    print('Error initializing Supabase: $e');
     rethrow;
   }
 }

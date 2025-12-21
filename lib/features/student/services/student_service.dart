@@ -14,12 +14,9 @@ class StudentService {
       // Get current authenticated user
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) {
-        print('🔍 StudentService: No authenticated user found');
         return null;
       }
 
-      print('🔍 StudentService: Current user ID: ${currentUser.id}');
-      print('🔍 StudentService: Current user email: ${currentUser.email}');
 
       // Find the student record linked to this user
       final studentRecord = await _supabase
@@ -57,13 +54,8 @@ class StudentService {
           .maybeSingle();
 
       if (studentRecord != null) {
-        print('🔍 StudentService: Found student record: ${studentRecord['student_id']}');
-        print(
-          '🔍 StudentService: Student name: ${studentRecord['users']['first_name']} ${studentRecord['users']['last_name']}',
-        );
         return studentRecord;
       } else {
-        print('🔍 StudentService: No student record found for user ${currentUser.id}');
 
         // Check if this user exists in the users table but not in students
         final userRecord = await _supabase
@@ -73,18 +65,14 @@ class StudentService {
             .maybeSingle();
 
         if (userRecord != null) {
-          print('🔍 StudentService: User exists but no student record: ${userRecord}');
           if (userRecord['user_type'] != 'student') {
-            print('🔍 StudentService: User is not a student (type: ${userRecord['user_type']})');
           }
         } else {
-          print('🔍 StudentService: User not found in users table');
         }
 
         return null;
       }
     } catch (e) {
-      print('🔍 StudentService: Error getting current student profile: $e');
       return null;
     }
   }
@@ -95,14 +83,11 @@ class StudentService {
       final studentProfile = await getCurrentStudentProfile();
       if (studentProfile != null) {
         final studentId = studentProfile['id'] as String?;
-        print('🔍 StudentService: Current student ID: $studentId');
         return studentId;
       }
 
-      print('🔍 StudentService: No student ID found - user may not be a student');
       return null;
     } catch (e) {
-      print('🔍 StudentService: Error getting current student ID: $e');
       return null;
     }
   }
@@ -128,18 +113,13 @@ class StudentService {
 
   /// Print comprehensive debug info about authentication and student data
   Future<void> printFullDebugInfo() async {
-    print('\n🔍 ==================== STUDENT SERVICE DEBUG ====================');
     await _authDebug.printAuthDebugInfo();
 
     // Additional checks
-    print('🎓 STUDENT SERVICE CHECKS:');
     final isValid = await isValidStudentUser();
-    print('   Is Valid Student User: $isValid');
 
     final studentId = await getCurrentStudentId();
-    print('   Student ID Retrieved: $studentId');
 
-    print('🔍 ============================================================\n');
   }
 
   /// Quick method to check all authentication and student data
@@ -171,7 +151,6 @@ class StudentService {
 
       return studentRecord != null;
     } catch (e) {
-      print('🔍 StudentService: Error checking valid student user: $e');
       return false;
     }
   }

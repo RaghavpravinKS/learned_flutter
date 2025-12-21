@@ -149,11 +149,6 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      // Debug: Print the data being sent
-      print('=== Assignment Data ===');
-      print(assignmentData);
-      print('======================');
-
       if (widget.assignment == null) {
         // Create new assignment
         assignmentData['created_at'] = DateTime.now().toIso8601String();
@@ -176,18 +171,6 @@ class _CreateAssignmentScreenState extends State<CreateAssignmentScreen> {
         );
       }
     } catch (e) {
-      // Debug: Print detailed error
-      print('=== Error Details ===');
-      print('Error type: ${e.runtimeType}');
-      print('Error message: $e');
-      if (e is PostgrestException) {
-        print('Postgrest code: ${e.code}');
-        print('Postgrest details: ${e.details}');
-        print('Postgrest hint: ${e.hint}');
-        print('Postgrest message: ${e.message}');
-      }
-      print('====================');
-
       if (mounted) {
         ScaffoldMessenger.of(
           context,

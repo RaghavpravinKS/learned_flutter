@@ -8,7 +8,6 @@ class Environment {
     if (_envSupabaseUrl.isEmpty) {
       throw Exception('SUPABASE_URL must be provided via --dart-define=SUPABASE_URL=your_url');
     }
-    print('Supabase URL: From env - $_envSupabaseUrl');
     return _envSupabaseUrl;
   }
 
@@ -17,7 +16,6 @@ class Environment {
     if (_envSupabaseAnonKey.isEmpty) {
       throw Exception('SUPABASE_ANON_KEY must be provided via --dart-define=SUPABASE_ANON_KEY=your_key');
     }
-    print('Supabase Key: From env');
     return _envSupabaseAnonKey;
   }
 

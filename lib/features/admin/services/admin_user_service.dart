@@ -15,8 +15,6 @@ class AdminUserService {
     String? phone,
   }) async {
     try {
-      print('🔐 Creating user with Supabase Auth: $email');
-
       // Use Supabase Auth to create user (this handles password hashing)
       final response = await _supabase.auth.signUp(
         email: email,
@@ -25,8 +23,6 @@ class AdminUserService {
       );
 
       if (response.user != null) {
-        print('✅ Auth user created: ${response.user!.id}');
-
         // Create corresponding record in public.users
         await _supabase.from('users').insert({
           'id': response.user!.id,
@@ -41,18 +37,13 @@ class AdminUserService {
           'updated_at': DateTime.now().toIso8601String(),
         });
 
-        print('✅ Public user record created');
-
         // Create role-specific record
         await _createRoleSpecificRecord(response.user!.id, userType);
 
-        print('✅ Role-specific record created for type: $userType');
         return response.user;
-      } else {
-        print('❌ Failed to create auth user');
       }
     } catch (e) {
-      print('❌ Error creating user: $e');
+      // Error creating user
     }
     return null;
   }
@@ -86,8 +77,7 @@ class AdminUserService {
         break;
 
       case 'admin':
-        // If you have an admins table, create record here
-        print('📝 Admin user type - no specific table needed');
+        // Admin user type - no specific table needed
         break;
 
       case 'parent':
@@ -107,8 +97,6 @@ class AdminUserService {
 class UserSeeder {
   /// Seed admin users
   static Future<void> seedAdminUsers() async {
-    print('🌱 Seeding admin users...');
-
     final adminUsers = [
       {
         'email': 'admin@learned.com',
@@ -127,19 +115,13 @@ class UserSeeder {
     ];
 
     for (final userData in adminUsers) {
-      final user = await AdminUserService.createUserWithPassword(
+      await AdminUserService.createUserWithPassword(
         email: userData['email']!,
         password: userData['password']!,
         userType: userData['user_type']!,
         firstName: userData['first_name']!,
         lastName: userData['last_name']!,
       );
-
-      if (user != null) {
-        print('✅ Created admin: ${userData['email']}');
-      } else {
-        print('❌ Failed to create admin: ${userData['email']}');
-      }
 
       // Delay to avoid rate limiting
       await Future.delayed(const Duration(milliseconds: 1000));
@@ -148,8 +130,6 @@ class UserSeeder {
 
   /// Seed test users for development
   static Future<void> seedTestUsers() async {
-    print('🧪 Seeding test users...');
-
     final testUsers = [
       {
         'email': 'student.test@learned.com',
@@ -175,17 +155,13 @@ class UserSeeder {
     ];
 
     for (final userData in testUsers) {
-      final user = await AdminUserService.createUserWithPassword(
+      await AdminUserService.createUserWithPassword(
         email: userData['email']!,
         password: userData['password']!,
         userType: userData['user_type']!,
         firstName: userData['first_name']!,
         lastName: userData['last_name']!,
       );
-
-      if (user != null) {
-        print('✅ Created test user: ${userData['email']}');
-      }
 
       await Future.delayed(const Duration(milliseconds: 1000));
     }

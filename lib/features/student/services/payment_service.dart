@@ -13,9 +13,6 @@ class PaymentService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      print('💳 PaymentService: Processing payment...');
-      print('💳 PaymentService: Amount: \$${amount.toStringAsFixed(2)}');
-      print('💳 PaymentService: Method: $paymentMethod');
 
       // Generate transaction ID
       final transactionId = 'txn_${DateTime.now().millisecondsSinceEpoch}_${studentId.substring(0, 8)}';
@@ -25,7 +22,6 @@ class PaymentService {
 
       // For development, simulate successful payment
       if (paymentMethod == 'simulation' || paymentMethod == 'test') {
-        print('💳 PaymentService: Using simulation mode');
         return _createSuccessfulPaymentResponse(transactionId, amount, paymentMethod);
       }
 
@@ -43,7 +39,6 @@ class PaymentService {
           metadata: metadata,
         );
 
-        print('💳 PaymentService: Payment record created with ID: $paymentId');
 
         return {
           'success': true,
@@ -56,12 +51,10 @@ class PaymentService {
           'created_at': DateTime.now().toIso8601String(),
         };
       } catch (dbError) {
-        print('💳 PaymentService: Database error: $dbError');
         // Return simulated success even if database fails
         return _createSuccessfulPaymentResponse(transactionId, amount, paymentMethod);
       }
     } catch (e) {
-      print('💳 PaymentService: Payment processing failed: $e');
       return {'success': false, 'error': e.toString(), 'error_code': 'PAYMENT_FAILED'};
     }
   }
@@ -116,8 +109,6 @@ class PaymentService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      print('💳 PaymentService: Processing webhook for transaction: $transactionId');
-      print('💳 PaymentService: Status: $status');
 
       // Call the database function to handle payment completion
       final result = await _supabase.rpc(
@@ -127,13 +118,11 @@ class PaymentService {
 
       if (result != null && result.isNotEmpty) {
         final webhookResult = result.first;
-        print('💳 PaymentService: Webhook processed: ${webhookResult['message']}');
         return webhookResult;
       }
 
       return {'success': false, 'error': 'No result from webhook processing'};
     } catch (e) {
-      print('💳 PaymentService: Webhook processing failed: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -141,7 +130,6 @@ class PaymentService {
   // Get payment history for a student
   Future<List<Map<String, dynamic>>> getPaymentHistory(String studentId) async {
     try {
-      print('💳 PaymentService: Fetching payment history for student: $studentId');
 
       final payments = await _supabase
           .from('payments')
@@ -152,10 +140,8 @@ class PaymentService {
           .eq('student_id', studentId)
           .order('created_at', ascending: false);
 
-      print('💳 PaymentService: Found ${payments.length} payment records');
       return List<Map<String, dynamic>>.from(payments);
     } catch (e) {
-      print('💳 PaymentService: Error fetching payment history: $e');
       // Return mock payment history for testing
       return [
         {
@@ -178,8 +164,6 @@ class PaymentService {
     String? reason,
   }) async {
     try {
-      print('💳 PaymentService: Processing refund for payment: $paymentId');
-      print('💳 PaymentService: Refund amount: \$${refundAmount.toStringAsFixed(2)}');
 
       // In a real implementation, you would call the payment provider's refund API
       // For now, simulate the refund process
@@ -199,7 +183,6 @@ class PaymentService {
             })
             .eq('id', paymentId);
 
-        print('💳 PaymentService: Refund processed successfully');
         return {
           'success': true,
           'refund_id': 'ref_${DateTime.now().millisecondsSinceEpoch}',
@@ -208,7 +191,6 @@ class PaymentService {
           'created_at': DateTime.now().toIso8601String(),
         };
       } catch (dbError) {
-        print('💳 PaymentService: Database update failed: $dbError');
         // Return simulated success even if database fails
         return {
           'success': true,
@@ -220,7 +202,6 @@ class PaymentService {
         };
       }
     } catch (e) {
-      print('💳 PaymentService: Refund processing failed: $e');
       return {'success': false, 'error': e.toString()};
     }
   }

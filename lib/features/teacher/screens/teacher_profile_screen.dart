@@ -29,28 +29,23 @@ class _TeacherProfileContentState extends State<TeacherProfileContent> {
 
   Future<void> _loadTeacherProfile() async {
     try {
-      print('DEBUG: Starting to load teacher profile...');
       setState(() {
         _isLoading = true;
         _error = null;
       });
 
       final teacherId = await _teacherService.getCurrentTeacherId();
-      print('DEBUG: Got teacher ID: $teacherId');
       if (teacherId == null) {
         throw Exception('Teacher not found');
       }
 
       // Load teacher data only
-      print('DEBUG: Loading teacher data...');
       await _loadTeacherData(teacherId);
 
-      print('DEBUG: Successfully loaded profile data');
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
-      print('DEBUG ERROR in _loadTeacherProfile: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -59,14 +54,12 @@ class _TeacherProfileContentState extends State<TeacherProfileContent> {
   }
 
   Future<void> _loadTeacherData(String teacherId) async {
-    print('DEBUG: Loading teacher data for ID: $teacherId');
     final response = await Supabase.instance.client
         .from('teachers')
         .select('*, users!inner(*)')
         .eq('id', teacherId)
         .single();
 
-    print('DEBUG: Teacher data loaded successfully');
     setState(() {
       _teacherData = response;
     });

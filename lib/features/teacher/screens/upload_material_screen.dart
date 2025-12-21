@@ -240,7 +240,6 @@ class _UploadMaterialScreenState extends State<UploadMaterialScreen> {
 
       return publicUrl;
     } catch (e) {
-      print('Storage upload error: $e');
       throw Exception('Failed to upload file: ${e.toString()}');
     }
   }

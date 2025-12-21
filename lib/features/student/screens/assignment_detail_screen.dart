@@ -39,8 +39,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
   }
 
   Future<void> _loadAssignment() async {
-    print('=== LOADING ASSIGNMENT DETAILS ===');
-    print('Assignment ID: ${widget.assignmentId}');
 
     try {
       // Get current user and student ID
@@ -50,7 +48,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
       final studentRecord = await _supabase.from('students').select('id').eq('user_id', userId).single();
 
       final studentDbId = studentRecord['id'] as String;
-      print('Student DB ID: $studentDbId');
 
       final response = await _supabase
           .from('assignments')
@@ -69,7 +66,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
           .eq('id', widget.assignmentId)
           .single();
 
-      print('Assignment loaded: ${response['title']}');
 
       // Extract classroom and teacher info
       final classroom = response['classrooms'] as Map<String, dynamic>?;
@@ -83,10 +79,8 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
           ? '$teacherFirstName $teacherLastName'
           : null;
 
-      print('Classroom: $classroomName, Teacher: $teacherName');
 
       // Check if this assignment has submissions (with grading info)
-      print('Checking for student submissions...');
       final submissions = await _supabase
           .from('student_assignment_attempts')
           .select('''
@@ -143,7 +137,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
               final lastName = graderResponse['last_name'] as String?;
               gradedByName = (firstName != null && lastName != null) ? '$firstName $lastName' : null;
             } catch (e) {
-              print('Error fetching grader info: $e');
             }
           }
         }
@@ -170,12 +163,9 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
           });
         }
 
-        print('Found ${allSubmissions.length} submission(s), latest status=$status, submitted_at=$submittedAt');
         if (isGraded) {
-          print('Graded: $gradePercentage% by $gradedByName at $gradedAtTime');
         }
       } else {
-        print('No submissions found for this assignment');
       }
 
       setState(() {
@@ -197,12 +187,7 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
         _isLoading = false;
       });
 
-      print('=== ASSIGNMENT DETAILS LOADED SUCCESSFULLY ===');
     } catch (e, stackTrace) {
-      print('=== ERROR LOADING ASSIGNMENT DETAILS ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      print('===========================================');
 
       setState(() => _isLoading = false);
       if (mounted) {
@@ -214,43 +199,28 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
   }
 
   Future<void> _pickFile() async {
-    print('=== FILE PICKER STARTED ===');
     try {
-      print('Opening file picker...');
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'],
       );
 
-      print('File picker result: $result');
-      print('Files selected: ${result?.files.length ?? 0}');
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
-        print('Selected file name: ${file.name}');
-        print('File size: ${file.size} bytes');
-        print('File path: ${file.path}');
-        print('File extension: ${file.extension}');
 
         setState(() {
           _selectedFileName = file.name;
           _selectedFilePath = file.path;
         });
 
-        print('File selected successfully: $_selectedFileName');
-        print('File path stored: $_selectedFilePath');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('File selected: ${file.name}')));
         }
       } else {
-        print('No file selected or result is null');
       }
     } catch (e, stackTrace) {
-      print('=== FILE PICKER ERROR ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      print('========================');
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -261,34 +231,25 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
   }
 
   Future<void> _submitAssignment() async {
-    print('=== SUBMIT ASSIGNMENT STARTED ===');
-    print('Selected file name: $_selectedFileName');
-    print('Selected file path: $_selectedFilePath');
-    print('Assignment ID: ${_assignment?.id}');
 
     if (_selectedFileName == null || _selectedFilePath == null) {
-      print('ERROR: No file selected');
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a file first')));
       return;
     }
 
     setState(() => _isSubmitting = true);
-    print('Submitting state set to true');
 
     try {
-      print('Starting file upload process...');
 
       // Get student ID
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
-      print('User ID: $userId');
 
       // Get student record
       final studentResponse = await _supabase.from('students').select('id').eq('user_id', userId).single();
       final studentId = studentResponse['id'] as String;
-      print('Student ID: $studentId');
 
       // Upload file to Supabase Storage
       final assignmentId = _assignment!.id;
@@ -297,14 +258,10 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
 
       // Calculate attempt number based on previous submissions
       final attemptNumber = _previousSubmissions.length + 1;
-      print('This is attempt #$attemptNumber');
 
       // Path structure: {student_id}/{assignment_id}/attempt_{n}/{filename}
       final storagePath = '$studentId/$assignmentId/attempt_$attemptNumber/$timestamp-$_selectedFileName';
 
-      print('Uploading file to storage...');
-      print('Bucket: assignment-attachments');
-      print('Storage path: $storagePath');
 
       final file = File(_selectedFilePath!);
       if (!await file.exists()) {
@@ -312,8 +269,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
       }
 
       final bytes = await file.readAsBytes();
-      print('File exists: true');
-      print('File size: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(2)} KB)');
 
       try {
         final uploadResponse = await _supabase.storage
@@ -324,17 +279,9 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
               fileOptions: FileOptions(contentType: _getContentType(fileExtension), upsert: false),
             );
 
-        print('Upload response: $uploadResponse');
-        print('File uploaded successfully to storage');
       } catch (storageError) {
-        print('=== STORAGE UPLOAD ERROR ===');
-        print('Error: $storageError');
-        print('Error type: ${storageError.runtimeType}');
         if (storageError is StorageException) {
-          print('Storage error message: ${storageError.message}');
-          print('Storage error status code: ${storageError.statusCode}');
         }
-        print('===========================');
 
         // Check if it's a policy/permission error
         if (storageError.toString().contains('403') ||
@@ -351,10 +298,8 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
 
       // Store the storage path (not the URL) since bucket requires authentication
       // We'll generate signed URLs when needed
-      print('File uploaded successfully. Storage path: $storagePath');
 
       // Create submission record in student_assignment_attempts table
-      print('Creating submission record in database...');
       final submissionData = {
         'assignment_id': assignmentId,
         'student_id': studentId,
@@ -368,11 +313,9 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
         'is_graded': false,
       };
 
-      print('Submission data: $submissionData');
 
       await _supabase.from('student_assignment_attempts').insert(submissionData);
 
-      print('Submission record created successfully');
 
       // Reload assignment to get updated submissions list
       await _loadAssignment();
@@ -383,9 +326,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
         _selectedFilePath = null;
       });
 
-      print('Assignment status updated to submitted');
-      print('Submitted at: ${_assignment?.submittedAt}');
-      print('=== SUBMIT ASSIGNMENT COMPLETED SUCCESSFULLY ===');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -396,10 +336,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
         );
       }
     } catch (e, stackTrace) {
-      print('=== SUBMIT ASSIGNMENT ERROR ===');
-      print('Error: $e');
-      print('Stack trace: $stackTrace');
-      print('==============================');
       setState(() => _isSubmitting = false);
       if (mounted) {
         ScaffoldMessenger.of(
@@ -410,8 +346,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
   }
 
   Future<void> _viewSubmittedFile(String fileUrl) async {
-    print('=== VIEWING SUBMITTED FILE ===');
-    print('File URL: $fileUrl');
 
     try {
       // Extract the file path from the stored URL
@@ -419,7 +353,6 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
 
       if (fileUrl.contains('assignment-attachments/')) {
         filePath = fileUrl.split('assignment-attachments/').last;
-        print('Extracted file path: $filePath');
       }
 
       Uri uri;
@@ -431,10 +364,8 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
               .from('assignment-attachments')
               .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-          print('Generated signed URL: $signedUrl');
           uri = Uri.parse(signedUrl);
         } catch (e) {
-          print('Error creating signed URL: $e, falling back to stored URL');
           uri = Uri.parse(fileUrl);
         }
       } else {
@@ -445,14 +376,11 @@ class _AssignmentDetailScreenState extends ConsumerState<AssignmentDetailScreen>
       final launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
 
       if (!launched) {
-        print('Failed to launch URL in browser view');
         // Try external application as fallback
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        print('Successfully opened file in browser view');
       }
     } catch (e) {
-      print('Error viewing file: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,

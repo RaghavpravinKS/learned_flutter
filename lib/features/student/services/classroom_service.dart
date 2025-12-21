@@ -21,7 +21,6 @@ class ClassroomService {
 
           if (firstName != null && firstName.isNotEmpty) {
             final fullName = lastName != null && lastName.isNotEmpty ? '$firstName $lastName' : firstName;
-            print('🔍 _resolveTeacherName: Found teacher name: $fullName');
             return fullName;
           }
         }
@@ -29,14 +28,12 @@ class ClassroomService {
         // Fallback to teacher_id if available
         final teacherId = teacher['teacher_id'] as String?;
         if (teacherId != null && teacherId.isNotEmpty) {
-          print('🔍 _resolveTeacherName: Using teacher_id fallback: $teacherId');
           return 'Teacher $teacherId';
         }
 
         // Fallback to teacher id
         final id = teacher['id'] as String?;
         if (id != null) {
-          print('🔍 _resolveTeacherName: Using teacher id fallback');
           return 'Teacher ${id.substring(0, 8)}...';
         }
       }
@@ -44,14 +41,11 @@ class ClassroomService {
       // Try to get teacher info directly from classroom if no nested relationship
       final teacherId = classroom['teacher_id'] as String?;
       if (teacherId != null && teacherId.isNotEmpty) {
-        print('🔍 _resolveTeacherName: Using classroom teacher_id: $teacherId');
         return 'Teacher ${teacherId.substring(0, 8)}...';
       }
 
-      print('🔍 _resolveTeacherName: No teacher info found, using default');
       return 'Teacher Info Unavailable';
     } catch (e) {
-      print('🔍 _resolveTeacherName: Error resolving teacher name: $e');
       return 'Teacher Info Unavailable';
     }
   }
@@ -83,7 +77,6 @@ class ClassroomService {
 
           if (firstName != null && firstName.isNotEmpty) {
             final fullName = lastName != null && lastName.isNotEmpty ? '$firstName $lastName' : firstName;
-            print('🔍 _getTeacherNameDirectly: Found teacher name: $fullName');
             return fullName;
           }
         }
@@ -97,7 +90,6 @@ class ClassroomService {
 
       return 'Teacher ${teacherId.substring(0, 8)}...';
     } catch (e) {
-      print('🔍 _getTeacherNameDirectly: Error: $e');
       return 'Teacher ${teacherId.substring(0, 8)}...';
     }
   }
@@ -105,10 +97,6 @@ class ClassroomService {
   // Fetch all available classrooms with their payment plans
   Future<List<Map<String, dynamic>>> getAvailableClassrooms({String? subject, String? board, int? gradeLevel}) async {
     try {
-      print(
-        '🔍 ClassroomService: fetching classrooms with filters - subject: $subject, board: $board, grade: $gradeLevel',
-      );
-
       var query = _supabase
           .from('classrooms')
           .select('''
@@ -141,7 +129,6 @@ class ClassroomService {
       }
 
       final response = await query;
-      print('🔍 Database returned ${response.length} classrooms');
 
       // Process the response to add calculated fields
       final classrooms = List<Map<String, dynamic>>.from(response);
@@ -160,7 +147,6 @@ class ClassroomService {
 
           classroom['student_count'] = studentCountResponse.length;
         } catch (e) {
-          print('🔍 Error getting student count for ${classroom['name']}: $e');
           classroom['student_count'] = 0;
         }
 
@@ -178,10 +164,8 @@ class ClassroomService {
         classroom['teacher_name'] = teacherName;
       }
 
-      print('🔍 Returning ${classrooms.length} processed classrooms');
       return classrooms;
     } catch (e) {
-      print('🔍 ERROR in getAvailableClassrooms: $e');
       rethrow;
     }
   }
@@ -189,8 +173,6 @@ class ClassroomService {
   // Get a single classroom by ID
   Future<Map<String, dynamic>> getClassroomById(String classroomId) async {
     try {
-      print('🔍 getClassroomById: Fetching classroom with ID: $classroomId');
-
       // First, get the basic classroom data
       final classroomResponse = await _supabase
           .from('classrooms')
@@ -199,12 +181,9 @@ class ClassroomService {
           .eq('is_active', true)
           .single();
 
-      print('🔍 getClassroomById: Basic classroom data fetched: ${classroomResponse['name']}');
-
       // Get teacher data separately
       Map<String, dynamic>? teacherData;
       if (classroomResponse['teacher_id'] != null) {
-        print('🔍 getClassroomById: Fetching teacher data for ID: ${classroomResponse['teacher_id']}');
         try {
           final teacherResponse = await _supabase
               .from('teachers')
@@ -223,16 +202,14 @@ class ClassroomService {
               .eq('id', classroomResponse['teacher_id'])
               .single();
           teacherData = teacherResponse;
-          print('🔍 getClassroomById: Teacher data fetched successfully');
         } catch (e) {
-          print('🔍 getClassroomById: Error fetching teacher data: $e');
+          // Error fetching teacher data
         }
       }
 
       // Get pricing data separately
       List<Map<String, dynamic>>? pricingData;
       try {
-        print('🔍 getClassroomById: Fetching pricing data...');
         final pricingResponse = await _supabase
             .from('classroom_pricing')
             .select('''
@@ -242,13 +219,11 @@ class ClassroomService {
             ''')
             .eq('classroom_id', classroomId);
         pricingData = List<Map<String, dynamic>>.from(pricingResponse);
-        print('🔍 getClassroomById: Pricing data fetched: ${pricingData.length} plans');
       } catch (e) {
-        print('🔍 getClassroomById: Error fetching pricing data: $e');
+        // Error fetching pricing data
       }
 
       // Get student count
-      print('🔍 getClassroomById: Fetching student count...');
       final studentCountResponse = await _supabase
           .from('student_enrollments')
           .select('id')
@@ -274,10 +249,8 @@ class ClassroomService {
 
       response['teacher_name'] = teacherName;
 
-      print('🔍 getClassroomById: Returning processed classroom data with ${response.keys.length} keys');
       return response;
     } catch (e) {
-      print('🔍 getClassroomById: ERROR - $e');
       rethrow;
     }
   }
@@ -291,40 +264,24 @@ class ClassroomService {
     String? transactionId,
   }) async {
     try {
-      print('🔍 enrollStudent: Starting enrollment process...');
-      print('🔍 enrollStudent: Input Student ID: $studentId');
-      print('🔍 enrollStudent: Classroom ID: $classroomId');
-      print('🔍 enrollStudent: Payment Plan ID: $paymentPlanId');
-      print('🔍 enrollStudent: Amount Paid: $amountPaid');
-
       // Get the actual authenticated student ID
       String? actualStudentId;
 
       if (studentId != null && studentId.isNotEmpty && studentId != 'mock-student-id') {
         // Use provided student ID if it's valid
         actualStudentId = studentId;
-        print('🔍 enrollStudent: Using provided student ID: $actualStudentId');
       } else {
         // Get from authenticated user
         actualStudentId = await _studentService.getCurrentStudentId();
-        print('🔍 enrollStudent: Retrieved student ID from auth: $actualStudentId');
       }
 
       // If no authenticated student found, try test data for development
       if (actualStudentId == null) {
-        print('🔍 enrollStudent: No authenticated student found, using test data');
         actualStudentId = '12345678-1234-5678-9012-345678901234'; // Test student from migration
       }
 
-      print('🔍 enrollStudent: Final student ID to use: $actualStudentId');
-
       try {
         // Use the correct database function for enrollment
-        print('🔍 enrollStudent: Using database function enroll_student_with_payment...');
-        print(
-          '🔍 enrollStudent: Calling function with: student_id=$actualStudentId, classroom_id=$classroomId, amount=$amountPaid',
-        );
-
         final result = await _supabase.rpc(
           'enroll_student_with_payment',
           params: {
@@ -335,22 +292,13 @@ class ClassroomService {
           },
         );
 
-        print('🔍 enrollStudent: Function completed successfully: $result');
-        print('🔍 enrollStudent: 🎉 ENROLLMENT COMPLETED SUCCESSFULLY via DB function! 🎉');
-        print('🔍 enrollStudent: RESULT DETAILS: $result');
-
         return {'success': true, 'message': 'Student enrolled successfully using database function'};
       } catch (dbError) {
-        print('🔍 enrollStudent: ❌ Database function failed: $dbError');
-        print('🔍 enrollStudent: ERROR TYPE: ${dbError.runtimeType}');
-        print('🔍 enrollStudent: Falling back to direct database operations...');
+        // Database function failed, falling back to direct operations
       }
 
       // Fallback: Legacy enrollment simulation
-      print('🔍 enrollStudent: Using fallback enrollment simulation...');
-
       // Simulate payment processing
-      print('🔍 enrollStudent: Simulating payment processing...');
       await Future.delayed(const Duration(milliseconds: 300));
 
       // Try to create basic enrollment record with proper UUID
@@ -364,12 +312,10 @@ class ClassroomService {
           'start_date': DateTime.now().toIso8601String(),
           'created_at': DateTime.now().toIso8601String(),
         });
-        print('🔍 enrollStudent: ✓ Fallback enrollment record created');
       } catch (e) {
-        print('🔍 enrollStudent: Fallback enrollment also failed: $e');
+        // Fallback enrollment also failed
       }
 
-      print('🔍 enrollStudent: 🎉 FALLBACK ENROLLMENT COMPLETED! 🎉');
       return {
         'success': true,
         'enrollment_id': 'fallback_${DateTime.now().millisecondsSinceEpoch}',
@@ -377,7 +323,6 @@ class ClassroomService {
         'message': 'Enrollment completed using fallback method',
       };
     } catch (e) {
-      print('🔍 enrollStudent: ERROR - $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -385,39 +330,24 @@ class ClassroomService {
   // Get enrolled classrooms for a student using database function
   Future<List<Map<String, dynamic>>> getEnrolledClassrooms(String? inputStudentId) async {
     try {
-      print('🔍 getEnrolledClassrooms: Starting method with input: $inputStudentId');
-
-      // Print comprehensive debug info first
-      await _studentService.printFullDebugInfo();
-
       // Get the actual authenticated student ID
       String? studentId;
 
       if (inputStudentId != null && inputStudentId.isNotEmpty && inputStudentId != 'mock-student-id') {
         // Use provided student ID if it's valid
         studentId = inputStudentId;
-        print('🔍 getEnrolledClassrooms: Using provided student ID: $studentId');
       } else {
         // Get from authenticated user
         studentId = await _studentService.getCurrentStudentId();
-        print('🔍 getEnrolledClassrooms: Retrieved student ID from auth: $studentId');
       }
 
       // If no authenticated student found, try test data for development
       if (studentId == null) {
-        print('🔍 getEnrolledClassrooms: No authenticated student found, using test data');
         studentId = '12345678-1234-5678-9012-345678901234'; // Test student from migration
-
-        // Also print current user debug info
-        final debugInfo = _studentService.currentUserDebugInfo;
-        print('🔍 getEnrolledClassrooms: Current user debug info: $debugInfo');
       }
-
-      print('🔍 getEnrolledClassrooms: Final student ID to use: $studentId');
 
       try {
         // Direct SQL query to get enrolled classrooms with all related data
-        print('🔍 getEnrolledClassrooms: Querying enrolled classrooms directly...');
         final assignments = await _supabase
             .from('student_enrollments')
             .select('''
@@ -441,28 +371,7 @@ class ClassroomService {
             .eq('student_id', studentId)
             .eq('status', 'active');
 
-        print('🔍 getEnrolledClassrooms: Raw database response: $assignments');
-
         if (assignments.isNotEmpty) {
-          print('🔍 getEnrolledClassrooms: Found ${assignments.length} enrolled classrooms from direct query');
-
-          // Print detailed info about each assignment
-          for (int i = 0; i < assignments.length; i++) {
-            final assignment = assignments[i];
-            print('🔍 Assignment $i: ${assignment}');
-            final classroom = assignment['classrooms'];
-            if (classroom != null) {
-              print('🔍 Classroom $i: ${classroom['name']} (ID: ${classroom['id']})');
-              final teacher = classroom['teachers'];
-              if (teacher != null) {
-                final teacherUser = teacher['users'];
-                if (teacherUser != null) {
-                  print('🔍 Teacher $i: ${teacherUser['first_name']} ${teacherUser['last_name']}');
-                }
-              }
-            }
-          }
-
           // Process and format the data
           final enrolledClassrooms = <Map<String, dynamic>>[];
           for (final assignment in assignments) {
@@ -493,7 +402,7 @@ class ClassroomService {
                     .eq('classroom_id', classroomId);
                 assignmentCount = assignmentResponse.length;
               } catch (e) {
-                print('Error fetching assignment count: $e');
+                // Error fetching assignment count
               }
 
               // Get materials count
@@ -504,7 +413,7 @@ class ClassroomService {
                     .eq('classroom_id', classroomId);
                 materialsCount = materialsResponse.length;
               } catch (e) {
-                print('Error fetching materials count: $e');
+                // Error fetching materials count
               }
 
               // Get upcoming sessions count (next 30 days)
@@ -519,7 +428,7 @@ class ClassroomService {
                     .lte('session_date', thirtyDaysLater);
                 sessionsCount = sessionsResponse.length;
               } catch (e) {
-                print('Error fetching sessions count: $e');
+                // Error fetching sessions count
               }
 
               enrolledClassrooms.add({
@@ -541,12 +450,10 @@ class ClassroomService {
             }
           }
 
-          print('🔍 getEnrolledClassrooms: Returning ${enrolledClassrooms.length} processed classrooms');
           return enrolledClassrooms;
         }
       } catch (dbError) {
-        print('🔍 getEnrolledClassrooms: Direct query failed: $dbError');
-        print('🔍 getEnrolledClassrooms: Falling back to legacy method...');
+        // Direct query failed, falling back to legacy method
       }
 
       // Fallback: Try legacy query method
@@ -572,8 +479,6 @@ class ClassroomService {
             ''')
             .eq('student_id', studentId)
             .eq('status', 'active');
-
-        print('🔍 getEnrolledClassrooms: Found ${assignments.length} enrolled classrooms from legacy query');
 
         // Process and format the data
         final enrolledClassrooms = <Map<String, dynamic>>[];
@@ -605,7 +510,7 @@ class ClassroomService {
                   .eq('classroom_id', classroomId);
               assignmentCount = assignmentResponse.length;
             } catch (e) {
-              print('Error fetching assignment count: $e');
+              // Error fetching assignment count
             }
 
             // Get materials count
@@ -616,7 +521,7 @@ class ClassroomService {
                   .eq('classroom_id', classroomId);
               materialsCount = materialsResponse.length;
             } catch (e) {
-              print('Error fetching materials count: $e');
+              // Error fetching materials count
             }
 
             // Get upcoming sessions count (next 30 days)
@@ -631,7 +536,7 @@ class ClassroomService {
                   .lte('session_date', thirtyDaysLater);
               sessionsCount = sessionsResponse.length;
             } catch (e) {
-              print('Error fetching sessions count: $e');
+              // Error fetching sessions count
             }
 
             enrolledClassrooms.add({
@@ -654,18 +559,15 @@ class ClassroomService {
         }
 
         if (enrolledClassrooms.isNotEmpty) {
-          print('🔍 getEnrolledClassrooms: Returning ${enrolledClassrooms.length} legacy enrolled classrooms');
           return enrolledClassrooms;
         }
       } catch (e) {
-        print('🔍 getEnrolledClassrooms: Legacy query also failed: $e');
+        // Legacy query also failed
       }
 
       // No enrollments found - return empty list for new users
-      print('🔍 getEnrolledClassrooms: No enrollments found, returning empty list');
       return [];
     } catch (e) {
-      print('🔍 getEnrolledClassrooms: ERROR - $e');
       rethrow;
     }
   }

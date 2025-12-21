@@ -10,7 +10,6 @@ final classroomLearningMaterialsProvider = FutureProvider.family<List<LearningMa
   try {
     final supabase = Supabase.instance.client;
 
-    print('=== Fetching learning materials for classroom: $classroomId ===');
 
     // Fetch learning materials from Supabase
     final response = await supabase
@@ -20,25 +19,19 @@ final classroomLearningMaterialsProvider = FutureProvider.family<List<LearningMa
         .order('upload_date', ascending: false)
         .limit(10); // Get most recent 10 materials
 
-    print('=== Learning materials response: ${response.length} items ===');
 
     if (response.isEmpty) {
-      print('=== No learning materials found for classroom ===');
       return [];
     }
 
     final materials = (response as List).map((item) {
       final material = LearningMaterialModel.fromMap(item as Map<String, dynamic>);
-      print('=== Material: ${material.title}, URL: ${material.fileUrl} ===');
       return material;
     }).toList();
 
-    print('=== Successfully parsed ${materials.length} learning materials ===');
 
     return materials;
   } catch (e, stackTrace) {
-    print('=== Error fetching learning materials: $e ===');
-    print('=== Stack trace: $stackTrace ===');
     rethrow;
   }
 });
@@ -51,7 +44,6 @@ final recentClassroomMaterialsProvider = FutureProvider.family<List<LearningMate
   try {
     final supabase = Supabase.instance.client;
 
-    print('=== Fetching recent learning materials for classroom: $classroomId ===');
 
     // Fetch top 3 most recent learning materials
     final response = await supabase
@@ -61,25 +53,19 @@ final recentClassroomMaterialsProvider = FutureProvider.family<List<LearningMate
         .order('upload_date', ascending: false)
         .limit(3);
 
-    print('=== Recent materials response: ${response.length} items ===');
 
     if (response.isEmpty) {
-      print('=== No recent materials found ===');
       return [];
     }
 
     final materials = (response as List).map((item) {
       final material = LearningMaterialModel.fromMap(item as Map<String, dynamic>);
-      print('=== Material: ${material.title}, Type: ${material.materialType}, URL: ${material.fileUrl} ===');
       return material;
     }).toList();
 
-    print('=== Successfully fetched ${materials.length} recent materials ===');
 
     return materials;
   } catch (e, stackTrace) {
-    print('=== Error fetching recent materials: $e ===');
-    print('=== Stack trace: $stackTrace ===');
     rethrow;
   }
 });
@@ -94,13 +80,11 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
       return [];
     }
 
-    print('=== Fetching all learning materials for student ===');
 
     // Get student's enrolled classrooms
     final studentResponse = await supabase.from('students').select('id').eq('user_id', userId).maybeSingle();
 
     if (studentResponse == null) {
-      print('=== No student record found ===');
       return [];
     }
 
@@ -113,13 +97,11 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
         .eq('student_id', studentId);
 
     if (enrollmentsResponse.isEmpty) {
-      print('=== No enrollments found ===');
       return [];
     }
 
     final classroomIds = (enrollmentsResponse as List).map((e) => e['classroom_id'] as String).toList();
 
-    print('=== Found ${classroomIds.length} enrolled classrooms ===');
 
     // Fetch learning materials from all enrolled classrooms with classroom and teacher names
     final response = await supabase
@@ -134,7 +116,6 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
         .inFilter('classroom_id', classroomIds)
         .order('upload_date', ascending: false);
 
-    print('=== Learning materials response: ${response.length} items ===');
 
     if (response.isEmpty) {
       return [];
@@ -162,12 +143,9 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
       return LearningMaterialModel.fromMap(materialMap);
     }).toList();
 
-    print('=== Successfully fetched ${materials.length} materials ===');
 
     return materials;
   } catch (e, stackTrace) {
-    print('=== Error fetching all student materials: $e ===');
-    print('=== Stack trace: $stackTrace ===');
     rethrow;
   }
 });

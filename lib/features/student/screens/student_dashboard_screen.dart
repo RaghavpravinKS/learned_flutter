@@ -107,6 +107,15 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
       onPopInvoked: (bool didPop) async {
         if (didPop) return;
 
+        // If on a drawer section other than dashboard, go back to dashboard
+        if (_currentDrawerSection != DrawerSection.dashboard) {
+          setState(() {
+            _currentDrawerSection = DrawerSection.dashboard;
+          });
+          return;
+        }
+
+        // Already on Dashboard - show exit confirmation
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) {
           // Exit the app
@@ -415,11 +424,8 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
             ),
             TextButton(
               onPressed: () {
-                print('🔘 View All button pressed');
-                print(' Current section before: $_currentDrawerSection');
                 // Switch to schedule section - we're already inside the state class
                 switchToDrawerSection(DrawerSection.schedule);
-                print('📍 Current section after: $_currentDrawerSection');
               },
               child: Row(
                 children: [

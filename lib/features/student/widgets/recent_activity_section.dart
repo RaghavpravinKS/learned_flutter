@@ -112,7 +112,6 @@ final recentActivitiesProvider = FutureProvider.autoDispose<List<Map<String, dyn
     // Return top 5 most recent activities
     return activities.take(5).toList();
   } catch (e) {
-    print('=== Error fetching recent activities: $e ===');
     return [];
   }
 });

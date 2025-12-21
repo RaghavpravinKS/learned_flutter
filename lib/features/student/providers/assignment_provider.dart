@@ -9,21 +9,15 @@ final assignmentRepositoryProvider = Provider<AssignmentRepository>((ref) {
 });
 
 final upcomingAssignmentsProvider = FutureProvider.autoDispose<List<Assignment>>((ref) async {
-  print('=== UPCOMING ASSIGNMENTS PROVIDER ===');
   final repository = ref.watch(assignmentRepositoryProvider);
   final userId = Supabase.instance.client.auth.currentUser?.id;
 
-  print('Current user ID: $userId');
 
   if (userId == null) {
-    print('ERROR: User not authenticated');
     throw Exception('User not authenticated');
   }
 
-  print('Fetching assignments from repository...');
   final assignments = await repository.getUpcomingAssignments(userId);
-  print('Provider returning ${assignments.length} assignments');
-  print('====================================');
 
   return assignments;
 });

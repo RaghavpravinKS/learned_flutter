@@ -7,7 +7,6 @@ class FlowVerificationHelper {
 
   /// Verify complete user registration and setup
   static Future<Map<String, dynamic>> verifyUserFlow(String? userEmail) async {
-    print('🔍 ==================== FLOW VERIFICATION ====================');
 
     final results = <String, dynamic>{
       'timestamp': DateTime.now().toIso8601String(),
@@ -30,7 +29,6 @@ class FlowVerificationHelper {
       };
 
       if (authUser == null) {
-        print('❌ No authenticated user found');
         return results;
       }
 
@@ -45,12 +43,10 @@ class FlowVerificationHelper {
       };
 
       if (publicUserResponse == null) {
-        print('❌ User not found in public.users table');
         return results;
       }
 
       final userType = publicUserResponse['user_type'];
-      print('🎭 User Type: $userType');
 
       // 3. Check role-specific table
       await _verifyRoleSpecificRecord(authUser.id, userType, results);
@@ -66,10 +62,8 @@ class FlowVerificationHelper {
       // 6. Test database connectivity
       await _verifyDatabaseConnectivity(results);
 
-      print('✅ Flow verification completed');
       return results;
     } catch (e) {
-      print('❌ Error during verification: $e');
       results['verification_results']['error'] = {
         'message': e.toString(),
         'occurred_at': DateTime.now().toIso8601String(),
@@ -241,84 +235,49 @@ class FlowVerificationHelper {
 
   /// Print detailed verification report
   static void printVerificationReport(Map<String, dynamic> results) {
-    print('🔍 ==================== VERIFICATION REPORT ====================');
-    print('📅 Timestamp: ${results['timestamp']}');
-    print('👤 User Email: ${results['user_email']}');
-    print('');
 
     final verificationResults = results['verification_results'] as Map<String, dynamic>;
 
     // Authentication status
     final auth = verificationResults['authentication'] as Map<String, dynamic>;
-    print('🔐 AUTHENTICATION:');
-    print('   ✅ User Logged In: ${auth['user_logged_in']}');
-    print('   ✅ Session Exists: ${auth['session_exists']}');
-    print('   ✅ Session Valid: ${auth['session_valid']}');
-    print('   📧 Email: ${auth['user_email']}');
-    print('');
 
     // Public user record
     final publicUser = verificationResults['public_user'] as Map<String, dynamic>;
-    print('👤 PUBLIC USER RECORD:');
-    print('   ✅ Exists: ${publicUser['exists']}');
-    print('   🎭 User Type: ${publicUser['user_type']}');
-    print('   📛 Name: ${publicUser['name']}');
-    print('');
 
     // Role-specific verification
     final userType = publicUser['user_type'];
     if (verificationResults.containsKey('${userType}_record')) {
       final roleRecord = verificationResults['${userType}_record'] as Map<String, dynamic>;
-      print('🎭 ${userType.toUpperCase()} RECORD:');
-      print('   ✅ Exists: ${roleRecord['exists']}');
       if (roleRecord['exists'] == true) {
         roleRecord.forEach((key, value) {
           if (key != 'exists' && key != 'data') {
-            print('   📋 $key: $value');
           }
         });
       }
-      print('');
     }
 
     // Enrollments (for students)
     if (verificationResults.containsKey('enrollments')) {
       final enrollments = verificationResults['enrollments'] as Map<String, dynamic>;
-      print('📚 ENROLLMENTS:');
-      print('   📊 Total: ${enrollments['count']}');
-      print('   ✅ Active: ${enrollments['active_count']}');
-      print('');
     }
 
     // Payments (for students)
     if (verificationResults.containsKey('payments')) {
       final payments = verificationResults['payments'] as Map<String, dynamic>;
-      print('💳 PAYMENTS:');
-      print('   📊 Total: ${payments['count']}');
-      print('   ✅ Successful: ${payments['successful_count']}');
-      print('');
     }
 
     // Profile completeness
     if (verificationResults.containsKey('profile_completeness')) {
       final profile = verificationResults['profile_completeness'] as Map<String, dynamic>;
-      print('📋 PROFILE COMPLETENESS:');
-      print('   📊 Completion: ${profile['percentage']}%');
-      print('   ✅ Complete: ${profile['is_complete']}');
-      print('');
     }
 
     // Database connectivity
     if (verificationResults.containsKey('database_connectivity')) {
       final db = verificationResults['database_connectivity'] as Map<String, dynamic>;
-      print('🗄️ DATABASE CONNECTIVITY:');
       db.forEach((table, accessible) {
-        print('   ${accessible ? '✅' : '❌'} $table: $accessible');
       });
-      print('');
     }
 
-    print('🔍 ========================================================');
   }
 
   /// Show verification dialog in the app

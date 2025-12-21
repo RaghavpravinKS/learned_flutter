@@ -656,19 +656,15 @@ class _SessionManagementScreenState extends ConsumerState<SessionManagementScree
   Future<void> _launchMeetingUrl(String url) async {
     try {
       final uri = Uri.parse(url);
-      print('🔗 Teacher launching meeting URL: $url');
 
       // Use platformDefault for better compatibility
       final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
 
       if (launched) {
-        print('✅ Meeting URL launched successfully');
       } else {
-        print('❌ Failed to launch meeting URL');
         throw 'Could not open meeting link';
       }
     } catch (e) {
-      print('❌ Error launching meeting URL: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open meeting link: ${e.toString()}'), backgroundColor: Colors.red),

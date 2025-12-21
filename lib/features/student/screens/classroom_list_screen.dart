@@ -49,13 +49,8 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
           });
         }
 
-        print('📚 Student Profile Loaded from DB:');
-        print('   Grade: $_studentGrade');
-        print('   Board: $_studentBoard');
-        print('   Filtering classrooms to match student\'s grade and board');
       } catch (e) {
         // Fallback to auth metadata if DB fetch fails
-        print('⚠️ Failed to load from DB, using auth metadata: $e');
         if (mounted) {
           setState(() {
             _studentGrade = user.userMetadata?['grade_level'] as int?;
@@ -182,8 +177,6 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, stack) {
-                print('Error loading classrooms: $error');
-                print('Stack trace: $stack');
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

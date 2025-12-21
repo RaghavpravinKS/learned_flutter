@@ -8,46 +8,16 @@ class RecurringSessionService {
   /// Create a new recurring session template
   Future<String> createRecurringSession(RecurringSessionModel session) async {
     try {
-      print('🔧 RecurringSessionService.createRecurringSession called');
-
-      // Debug: Check auth session and JWT
-      final currentSession = _supabase.auth.currentSession;
-      print('🔐 Auth Session Check:');
-      print('   Session exists: ${currentSession != null}');
-      print(
-        '   Access Token: ${currentSession?.accessToken != null ? "✅ Present (${currentSession!.accessToken.substring(0, 20)}...)" : "❌ Missing"}',
-      );
-      print('   User ID from session: ${currentSession?.user.id}');
-
-      print('📦 Session data to insert:');
       final dataToInsert = session.toMap();
 
       // Remove id field - let database generate it
       dataToInsert.remove('id');
 
-      print('   ${dataToInsert.toString()}');
-
-      print('👤 Current user: ${_supabase.auth.currentUser?.id}');
-      print('📧 Current email: ${_supabase.auth.currentUser?.email}');
-
-      print('💾 Inserting into recurring_sessions table...');
       final response = await _supabase.from('recurring_sessions').insert(dataToInsert).select().single();
 
-      print('✅ Insert successful! Response:');
-      print('   ${response.toString()}');
-
       final id = response['id'] as String;
-      print('🎉 Recurring session created with ID: $id');
       return id;
     } catch (e) {
-      print('❌ Error in createRecurringSession: $e');
-      print('💡 Error type: ${e.runtimeType}');
-      if (e is PostgrestException) {
-        print('   Code: ${e.code}');
-        print('   Message: ${e.message}');
-        print('   Details: ${e.details}');
-        print('   Hint: ${e.hint}');
-      }
       throw Exception('Failed to create recurring session: $e');
     }
   }
@@ -178,13 +148,6 @@ class RecurringSessionService {
           '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}:00';
       final endTimeStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}:00';
 
-      print('🔍 Previewing recurring session hours:');
-      print('   Classroom: $classroomId');
-      print('   Days: $recurrenceDays');
-      print('   Time: $startTimeStr - $endTimeStr');
-      print('   Start Date: ${startDate.toIso8601String().split('T')[0]}');
-      print('   End Date: ${endDate?.toIso8601String().split('T')[0] ?? 'No end date'}');
-
       final response = await _supabase.rpc(
         'preview_recurring_session_hours',
         params: {
@@ -196,8 +159,6 @@ class RecurringSessionService {
           'p_end_date': endDate?.toIso8601String().split('T')[0],
         },
       );
-
-      print('✅ Preview response: $response');
 
       // Response is a list with one row
       if (response is List && response.isNotEmpty) {
@@ -214,7 +175,6 @@ class RecurringSessionService {
 
       throw Exception('Invalid response from preview function');
     } catch (e) {
-      print('❌ Error previewing recurring session hours: $e');
       throw Exception('Failed to preview recurring session hours: $e');
     }
   }

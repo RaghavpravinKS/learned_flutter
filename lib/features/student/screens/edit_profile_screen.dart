@@ -42,13 +42,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   void _populateFields(Map<String, dynamic> studentProfile) {
-    print('DEBUG: _populateFields called');
-    print('DEBUG: studentProfile keys: ${studentProfile.keys}');
-    print('DEBUG: studentProfile data: $studentProfile');
 
     final userInfo = studentProfile['users'] as Map<String, dynamic>;
-    print('DEBUG: userInfo keys: ${userInfo.keys}');
-    print('DEBUG: userInfo data: $userInfo');
 
     _firstNameController.text = userInfo['first_name'] ?? '';
     _lastNameController.text = userInfo['last_name'] ?? '';
@@ -56,19 +51,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _schoolController.text = studentProfile['school_name'] ?? '';
     _currentImageUrl = userInfo['profile_image_url'];
 
-    print('DEBUG: First Name: ${_firstNameController.text}');
-    print('DEBUG: Last Name: ${_lastNameController.text}');
-    print('DEBUG: Phone: ${_phoneController.text}');
-    print('DEBUG: School: ${_schoolController.text}');
 
     final gradeLevel = studentProfile['grade_level'];
     if (gradeLevel != null) {
       _selectedGrade = 'Grade $gradeLevel';
     }
-    print('DEBUG: Grade Level: $_selectedGrade');
 
     _selectedBoard = studentProfile['board'];
-    print('DEBUG: Board: $_selectedBoard');
   }
 
   Future<void> _pickImage() async {
@@ -100,7 +89,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (_selectedImage == null) return _currentImageUrl;
 
     try {
-      print('DEBUG: Uploading profile image...');
       final supabase = Supabase.instance.client;
       final currentUser = supabase.auth.currentUser;
 
@@ -112,52 +100,38 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final studentData = await supabase.from('students').select('id').eq('user_id', currentUser.id).single();
 
       final studentId = studentData['id'];
-      print('DEBUG: Student ID: $studentId');
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'students/$studentId/profile_$timestamp.jpg';
 
-      print('DEBUG: User ID: ${currentUser.id}');
-      print('DEBUG: File name: $fileName');
 
       final bytes = await _selectedImage!.readAsBytes();
-      print('DEBUG: Image size: ${bytes.length} bytes');
 
       // Delete old file if exists
       if (_currentImageUrl != null && _currentImageUrl!.contains('profile-images')) {
         try {
           final oldFileName = _currentImageUrl!.split('/profile-images/').last;
-          print('DEBUG: Attempting to delete old file: $oldFileName');
           await supabase.storage.from('profile-images').remove([oldFileName]);
-          print('DEBUG: Old file deleted');
         } catch (e) {
-          print('DEBUG: Could not delete old file (may not exist): $e');
         }
       }
 
-      print('DEBUG: Uploading to storage bucket: profile-images');
       await supabase.storage
           .from('profile-images')
           .uploadBinary(fileName, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg'));
 
-      print('DEBUG: Upload successful');
 
       // Generate a signed URL (valid for 1 year)
       final signedUrl = await supabase.storage.from('profile-images').createSignedUrl(fileName, 31536000);
 
-      print('DEBUG: Signed URL: $signedUrl');
       return signedUrl;
     } catch (e, stackTrace) {
-      print('DEBUG: Image upload error: $e');
-      print('DEBUG: Stack trace: $stackTrace');
       throw Exception('Failed to upload profile image: $e');
     }
   }
 
   Future<void> _saveProfile() async {
-    print('DEBUG: _saveProfile called');
     if (!_formKey.currentState!.validate()) {
-      print('DEBUG: Form validation failed');
       return;
     }
 
@@ -168,25 +142,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final currentUser = supabase.auth.currentUser;
 
       if (currentUser == null) {
-        print('DEBUG: No authenticated user found');
         throw Exception('No authenticated user found');
       }
 
-      print('DEBUG: Current user ID: ${currentUser.id}');
 
       // Upload image if selected
       String? imageUrl = _currentImageUrl;
       if (_selectedImage != null) {
-        print('DEBUG: Uploading new profile image...');
         imageUrl = await _uploadProfileImage();
-        print('DEBUG: Image uploaded: $imageUrl');
       }
 
       // Update user information (including phone and profile image)
-      print('DEBUG: Updating users table...');
-      print('DEBUG: First Name: ${_firstNameController.text.trim()}');
-      print('DEBUG: Last Name: ${_lastNameController.text.trim()}');
-      print('DEBUG: Phone: ${_phoneController.text.trim()}');
 
       await supabase
           .from('users')
@@ -199,15 +165,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           })
           .eq('id', currentUser.id);
 
-      print('DEBUG: Users table updated successfully');
 
       // Update student-specific information
       final gradeNumber = _selectedGrade != null ? int.tryParse(_selectedGrade!.replaceAll('Grade ', '')) : null;
 
-      print('DEBUG: Updating students table...');
-      print('DEBUG: School: ${_schoolController.text.trim()}');
-      print('DEBUG: Grade Number: $gradeNumber');
-      print('DEBUG: Board: $_selectedBoard');
 
       await supabase
           .from('students')
@@ -219,14 +180,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           })
           .eq('user_id', currentUser.id);
 
-      print('DEBUG: Students table updated successfully');
 
       // Invalidate the profile provider to refresh data
       ref.invalidate(currentStudentProfileProvider);
-      print('DEBUG: Profile provider invalidated');
 
       if (mounted) {
-        print('DEBUG: Showing success message');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green));
@@ -234,14 +192,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         // Navigate back after a short delay
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) {
-            print('DEBUG: Navigating back');
             context.pop();
           }
         });
       }
     } catch (e, stackTrace) {
-      print('DEBUG: Error updating profile: $e');
-      print('DEBUG: Stack trace: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -256,9 +211,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('DEBUG: EditProfileScreen build called');
     final studentProfileAsync = ref.watch(currentStudentProfileProvider);
-    print('DEBUG: studentProfileAsync state: ${studentProfileAsync.runtimeType}');
 
     return Scaffold(
       appBar: AppBar(
@@ -269,12 +222,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
       body: studentProfileAsync.when(
         loading: () {
-          print('DEBUG: Loading student profile...');
           return const Center(child: CircularProgressIndicator());
         },
         error: (error, stack) {
-          print('DEBUG: Error loading profile: $error');
-          print('DEBUG: Stack trace: $stack');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -298,14 +248,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           );
         },
         data: (studentProfile) {
-          print('DEBUG: Student profile data received');
-          print('DEBUG: studentProfile is null: ${studentProfile == null}');
           if (studentProfile != null) {
-            print('DEBUG: studentProfile keys: ${studentProfile.keys}');
           }
 
           if (studentProfile == null) {
-            print('DEBUG: Student profile is null');
             return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -322,14 +268,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
           // Populate fields with data if not already done
           if (!_hasChanges && _firstNameController.text.isEmpty) {
-            print('DEBUG: Scheduling field population');
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _populateFields(studentProfile);
             });
-          } else {
-            print(
-              'DEBUG: Skipping field population - hasChanges: $_hasChanges, firstName isEmpty: ${_firstNameController.text.isEmpty}',
-            );
           }
 
           return SingleChildScrollView(

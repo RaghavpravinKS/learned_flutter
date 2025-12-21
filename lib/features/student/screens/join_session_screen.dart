@@ -77,7 +77,6 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
       // Get meeting URL from session data
       final meetingUrl = _sessionData['meeting_url'] as String?;
 
-      print('📞 Attempting to join session with URL: $meetingUrl');
 
       if (meetingUrl == null || meetingUrl.isEmpty) {
         throw 'No meeting URL available for this session';
@@ -90,26 +89,20 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
 
       // Launch the meeting URL
       final uri = Uri.parse(meetingUrl);
-      print('🔗 Parsed URI: $uri');
 
       // Try to launch with platformDefault first (opens in browser or app)
       // This is more reliable than externalApplication on Android
       try {
-        print('✅ Attempting to launch URL...');
         final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
 
         if (launched) {
-          print('✅ URL launched successfully');
         } else {
-          print('❌ Launch returned false');
           throw 'Failed to open meeting URL';
         }
       } catch (launchError) {
-        print('❌ Launch error: $launchError');
         throw 'Could not open meeting URL. Error: $launchError';
       }
     } catch (e) {
-      print('❌ Error joining session: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

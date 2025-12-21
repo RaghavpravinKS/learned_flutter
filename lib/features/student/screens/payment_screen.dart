@@ -40,15 +40,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final theme = Theme.of(context);
     final pricingList = widget.classroom['classroom_pricing'] as List? ?? [];
 
-    // Debug: Print pricing list info
-    print('🔍 PaymentScreen: Building with ${pricingList.length} pricing options');
-    print('🔍 PaymentScreen: Selected plan index: $_selectedPlanIndex');
-    for (int i = 0; i < pricingList.length; i++) {
-      final pricing = pricingList[i];
-      final plan = pricing['payment_plans'] as Map<String, dynamic>?;
-      print('🔍 Plan $i: ${plan?['name']} - \$${pricing['price']}');
-    }
-
     // Get selected pricing info
     final selectedPricing = pricingList.isNotEmpty ? pricingList[_selectedPlanIndex] : null;
     final price = selectedPricing?['price'] ?? 0.0;
@@ -190,10 +181,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                       setState(() {
                                         _selectedPlanIndex = value ?? 0;
                                       });
-                                      print('🔍 Payment plan selected: index $_selectedPlanIndex');
-                                      final selectedPlan = pricingList[_selectedPlanIndex];
-                                      final planData = selectedPlan['payment_plans'] as Map<String, dynamic>?;
-                                      print('🔍 Selected plan: ${planData?['name']} - \$${selectedPlan['price']}');
                                     },
                                     title: Text(plan?['name'] ?? 'Plan ${index + 1}'),
                                     subtitle: Column(
@@ -488,12 +475,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     });
 
     try {
-      print('🔍 _processPayment: Starting payment simulation...');
 
       // Simulate instant payment processing (bypassed for testing)
       await Future.delayed(const Duration(milliseconds: 500));
 
-      print('🔍 _processPayment: Payment simulated successfully');
 
       // Get pricing info based on selected plan
       final pricingList = widget.classroom['classroom_pricing'] as List?;
@@ -503,12 +488,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final price = pricingInfo?['price'] ?? 0.0;
       final paymentPlan = pricingInfo?['payment_plans'] as Map<String, dynamic>?;
 
-      print('🔍 _processPayment: Selected plan index: $_selectedPlanIndex');
-      print('🔍 _processPayment: Price: $price, Payment plan: ${paymentPlan?['name']}');
 
       // Enroll student (mock student ID for now)
       final classroomService = ClassroomService();
-      print('🔍 _processPayment: Calling enrollStudent...');
 
       await classroomService.enrollStudent(
         studentId: null, // Use authenticated student ID
@@ -517,7 +499,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         amountPaid: price.toDouble(),
       );
 
-      print('🔍 _processPayment: Enrollment successful');
 
       if (mounted) {
         // Show success dialog
@@ -562,7 +543,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         );
       }
     } catch (e) {
-      print('🔍 _processPayment: ERROR - $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,

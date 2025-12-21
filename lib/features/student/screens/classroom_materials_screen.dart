@@ -193,7 +193,6 @@ class ClassroomMaterialsScreen extends ConsumerWidget {
     }
 
     try {
-      print('=== Attempting to view material: ${material.title} ===');
       String? filePath;
       final storedUrl = material.fileUrl!;
 

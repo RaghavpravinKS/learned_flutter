@@ -51,7 +51,6 @@ class TeacherService {
           final assignmentResponse = await _supabase.from('assignments').select('id').eq('classroom_id', classroomId);
           classroom['assignment_count'] = assignmentResponse.length;
         } catch (e) {
-          print('Error fetching assignment count: $e');
           classroom['assignment_count'] = 0;
         }
 
@@ -63,7 +62,6 @@ class TeacherService {
               .eq('classroom_id', classroomId);
           classroom['materials_count'] = materialsResponse.length;
         } catch (e) {
-          print('Error fetching materials count: $e');
           classroom['materials_count'] = 0;
         }
 
@@ -77,14 +75,12 @@ class TeacherService {
               .gte('session_date', thirtyDaysAgo.toIso8601String().split('T')[0]);
           classroom['recent_sessions'] = sessionsResponse.length;
         } catch (e) {
-          print('Error fetching sessions count: $e');
           classroom['recent_sessions'] = 0;
         }
       }
 
       return classrooms;
     } catch (e) {
-      print('Error fetching teacher classrooms: $e');
       return [];
     }
   }
@@ -118,7 +114,6 @@ class TeacherService {
 
       return response;
     } catch (e) {
-      print('Error fetching teacher profile: $e');
       return null;
     }
   }
@@ -133,7 +128,6 @@ class TeacherService {
 
       return response['id'] as String?;
     } catch (e) {
-      print('Error getting current teacher ID: $e');
       return null;
     }
   }
@@ -178,7 +172,6 @@ class TeacherService {
         'totalMaterials': totalMaterials,
       };
     } catch (e) {
-      print('Error fetching teacher statistics: $e');
       return {'classrooms': 0, 'students': 0, 'assignments': 0, 'materials': 0};
     }
   }
@@ -229,7 +222,6 @@ class TeacherService {
       activities.sort((a, b) => DateTime.parse(b['time']).compareTo(DateTime.parse(a['time'])));
       return activities.take(limit).toList();
     } catch (e) {
-      print('Error fetching recent activities: $e');
       return [];
     }
   }

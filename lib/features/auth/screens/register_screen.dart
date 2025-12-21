@@ -102,7 +102,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     _showErrorSnackBar(errorMessage);
-    print(error);
   }
 
   Future<void> _register() async {
@@ -170,7 +169,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     } catch (e) {
       _handleAuthError(e);
-      print(e);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

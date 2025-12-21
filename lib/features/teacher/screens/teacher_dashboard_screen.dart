@@ -11,6 +11,7 @@ import 'my_classrooms_screen.dart';
 import 'assignment_management_screen.dart';
 import 'materials_management_screen.dart';
 import 'teacher_profile_screen.dart';
+import 'classroom_detail_screen.dart';
 
 enum TeacherDrawerSection { dashboard, profile, analytics, settings, help }
 
@@ -114,7 +115,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         _isLoading = false;
       });
     } catch (e) {
-      print('DEBUG: Error loading teacher data: $e');
       setState(() {
         _error = 'Failed to load teacher data: $e';
         _isLoading = false;
@@ -124,12 +124,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
 
   Future<List<Map<String, dynamic>>> _loadUpcomingSessions(String teacherId) async {
     try {
-      print('=== LOADING UPCOMING SESSIONS ===');
-      print('Teacher ID: $teacherId');
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      print('Current time: $now');
-      print('Today date: $today');
 
       // Query sessions from today onwards
       final response = await Supabase.instance.client
@@ -157,8 +153,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           .order('start_time', ascending: true)
           .limit(10); // Get more and filter in code
 
-      print('Raw response: $response');
-      print('Number of sessions found: ${(response as List).length}');
 
       // Filter sessions to only include future ones
       final allSessions = List<Map<String, dynamic>>.from(response);
@@ -176,7 +170,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           int.parse(timeParts[1]),
         );
 
-        print('Session: ${session['classrooms']['name']} at $sessionDateTime (${session['title']})');
 
         if (sessionDateTime.isAfter(now)) {
           futureSessions.add(session);
@@ -184,11 +177,8 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         }
       }
 
-      print('Filtered future sessions: ${futureSessions.length}');
       return futureSessions;
     } catch (e, stackTrace) {
-      print('Error loading upcoming sessions: $e');
-      print('Stack trace: $stackTrace');
       return [];
     }
   }
@@ -282,6 +272,25 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
       onPopInvoked: (bool didPop) async {
         if (didPop) return;
 
+        // If on a drawer section other than dashboard, go back to dashboard
+        if (_currentDrawerSection != TeacherDrawerSection.dashboard) {
+          setState(() {
+            _currentDrawerSection = TeacherDrawerSection.dashboard;
+            _currentIndex = 0;
+          });
+          return;
+        }
+
+        // If on Classes tab (index 1), go back to Home tab (index 0)
+        if (_currentIndex != 0) {
+          setState(() {
+            _currentIndex = 0;
+          });
+          _pageController.jumpToPage(0);
+          return;
+        }
+
+        // Already on Dashboard Home - show exit confirmation
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) {
           // Exit the app
@@ -655,7 +664,12 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     ),
                     trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
                     onTap: () {
-                      // TODO: Navigate to classroom details
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ClassroomDetailScreen(classroomId: classroom['id']),
+                        ),
+                      );
                     },
                   ),
                 ),

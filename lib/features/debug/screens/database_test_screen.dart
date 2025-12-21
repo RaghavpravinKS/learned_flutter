@@ -29,10 +29,6 @@ class _DatabaseTestScreenState extends ConsumerState<DatabaseTestScreen> {
       setState(() {
         _result += '❌ Test Failed: $e\n';
         _result += 'Stack trace:\n$s';
-        print('===== TEST FAILED =====');
-        print(e);
-        print(s);
-        print('=======================');
       });
     } finally {
       setState(() {

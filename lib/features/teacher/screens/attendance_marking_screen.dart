@@ -74,7 +74,6 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
         _enrolledStudents = List<Map<String, dynamic>>.from(response as List);
       });
     } catch (e) {
-      print('Error loading enrolled students: $e');
       rethrow;
     }
   }
@@ -116,7 +115,6 @@ class _AttendanceMarkingScreenState extends State<AttendanceMarkingScreen> {
         _attendanceList = attendance;
       });
     } catch (e) {
-      print('Error loading attendance: $e');
       rethrow;
     }
   }
