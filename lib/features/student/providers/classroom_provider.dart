@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/classroom_service.dart';
+import '../services/payment_service.dart';
 
 final classroomServiceProvider = Provider<ClassroomService>((ref) {
   return ClassroomService();
@@ -165,4 +166,72 @@ final studentEnrollmentsProvider = FutureProvider.autoDispose.family<Map<String,
 ) async {
   // This would normally fetch the student's enrollments
   return {'enrollments': [], 'active_subscriptions': [], 'upcoming_sessions': []};
+});
+
+// Check if student has a pending payment for a specific classroom
+final pendingPaymentForClassroomProvider = FutureProvider.autoDispose.family<Map<String, dynamic>?, String>((
+  ref,
+  classroomId,
+) async {
+  final paymentService = PaymentService();
+  final pendingPayments = await paymentService.getPendingPayments();
+
+  // Find a pending payment for this specific classroom
+  try {
+    return pendingPayments.firstWhere((payment) => payment['classroom_id'] == classroomId);
+  } catch (e) {
+    return null; // No pending payment found
+  }
+});
+
+// Get enrollment details including subscription expiry for a classroom
+final enrollmentDetailsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>?, String>((
+  ref,
+  classroomId,
+) async {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+
+  if (userId == null) {
+    return null;
+  }
+
+  try {
+    // Get student ID
+    final studentResponse = await supabase.from('students').select('id').eq('user_id', userId).maybeSingle();
+
+    if (studentResponse == null) {
+      return null;
+    }
+
+    final studentId = studentResponse['id'] as String;
+
+    // First, check if there's an enrollment record with expiry date
+    final enrollmentResponse = await supabase
+        .from('student_enrollments')
+        .select('*, payment_plans(name, billing_cycle)')
+        .eq('student_id', studentId)
+        .eq('classroom_id', classroomId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+    if (enrollmentResponse != null) {
+      return enrollmentResponse;
+    }
+
+    // Fallback: Check completed payments for this classroom to get expiry
+    final paymentResponse = await supabase
+        .from('payments')
+        .select('*, payment_plans(name, billing_cycle)')
+        .eq('student_id', studentId)
+        .eq('classroom_id', classroomId)
+        .eq('status', 'completed')
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    return paymentResponse;
+  } catch (e) {
+    return null;
+  }
 });

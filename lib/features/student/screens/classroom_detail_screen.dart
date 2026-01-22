@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:learned_flutter/core/theme/app_colors.dart';
 import 'package:learned_flutter/features/student/providers/classroom_provider.dart';
+import 'package:learned_flutter/features/student/services/payment_service.dart';
+import 'package:intl/intl.dart';
 
 class ClassroomDetailScreen extends ConsumerWidget {
   final String classroomId;
@@ -23,10 +26,14 @@ class ClassroomDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final classroomAsync = ref.watch(classroomDetailsProvider(classroomId));
     final enrollmentStatusAsync = ref.watch(studentEnrollmentStatusProvider(classroomId));
+    final pendingPaymentAsync = ref.watch(pendingPaymentForClassroomProvider(classroomId));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Classroom Details'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
       ),
       body: classroomAsync.when(
@@ -48,14 +55,24 @@ class ClassroomDetailScreen extends ConsumerWidget {
         ),
         data: (classroom) => enrollmentStatusAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => _buildClassroomDetails(context, ref, classroom, false),
-          data: (isEnrolled) => _buildClassroomDetails(context, ref, classroom, isEnrolled),
+          error: (error, stack) => _buildClassroomDetails(context, ref, classroom, false, null),
+          data: (isEnrolled) => pendingPaymentAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => _buildClassroomDetails(context, ref, classroom, isEnrolled, null),
+            data: (pendingPayment) => _buildClassroomDetails(context, ref, classroom, isEnrolled, pendingPayment),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildClassroomDetails(BuildContext context, WidgetRef ref, Map<String, dynamic> classroom, bool isEnrolled) {
+  Widget _buildClassroomDetails(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> classroom,
+    bool isEnrolled,
+    Map<String, dynamic>? pendingPayment,
+  ) {
     final theme = Theme.of(context);
 
     // Debug pricing information
@@ -364,8 +381,151 @@ class ClassroomDetailScreen extends ConsumerWidget {
                 ),
               ),
             ),
+          ] else if (pendingPayment != null) ...[
+            // Pending Payment UI
+            Card(
+              color: Colors.orange.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.pending, color: Colors.orange.shade700, size: 32),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Payment Pending Verification',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.orange.shade800,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Your payment is under review by the admin',
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+
+                    // Payment Details
+                    _buildPaymentDetailRow(
+                      theme,
+                      'Amount',
+                      '₹${(pendingPayment['amount'] ?? 0.0).toStringAsFixed(2)}',
+                      Icons.currency_rupee,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPaymentDetailRow(
+                      theme,
+                      'Payment Method',
+                      _getPaymentMethodDisplay(pendingPayment['payment_method']),
+                      Icons.payment,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPaymentDetailRow(
+                      theme,
+                      'Submitted',
+                      _formatDate(pendingPayment['created_at']),
+                      Icons.calendar_today,
+                    ),
+
+                    // Payment Proof Preview
+                    if (pendingPayment['payment_proof_path'] != null) ...[
+                      const Divider(height: 24),
+                      Text('Payment Proof', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      FutureBuilder<String>(
+                        future: PaymentService().getPaymentProofUrl(pendingPayment['payment_proof_path']),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return Container(
+                              height: 150,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(child: CircularProgressIndicator()),
+                            );
+                          }
+                          if (snapshot.hasError || !snapshot.hasData) {
+                            return Container(
+                              height: 150,
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.error, color: Colors.red),
+                                    SizedBox(height: 8),
+                                    Text('Failed to load image'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              snapshot.data!,
+                              height: 200,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 150,
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Center(child: Icon(Icons.broken_image, size: 48)),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, size: 20, color: Colors.blue.shade700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Verification typically takes 1-2 business days. You will be notified once approved.',
+                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.blue.shade900),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ] else ...[
-            // Non-enrolled Student UI
+            // Non-enrolled Student UI - No pending payment
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -418,5 +578,50 @@ class ClassroomDetailScreen extends ConsumerWidget {
   void _viewProgress(BuildContext context, Map<String, dynamic> classroom) {
     // TODO: Navigate to student progress screen
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Progress tracking coming soon!')));
+  }
+
+  // Helper method to build payment detail rows
+  Widget _buildPaymentDetailRow(ThemeData theme, String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w500,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Expanded(
+          child: Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+        ),
+      ],
+    );
+  }
+
+  // Helper method to format date
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return 'N/A';
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('MMM dd, yyyy').format(date);
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  // Helper method to display payment method
+  String _getPaymentMethodDisplay(String? method) {
+    switch (method?.toLowerCase()) {
+      case 'upi':
+        return 'UPI Payment';
+      case 'bank_transfer':
+        return 'Bank Transfer';
+      case 'card':
+        return 'Card Payment';
+      default:
+        return method ?? 'Unknown';
+    }
   }
 }

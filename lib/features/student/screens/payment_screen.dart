@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:learned_flutter/features/student/services/classroom_service.dart';
+import 'package:learned_flutter/features/student/services/payment_service.dart';
 import 'package:learned_flutter/features/student/screens/my_classes_screen.dart';
 import 'package:learned_flutter/features/student/providers/student_profile_provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> classroom;
@@ -17,21 +21,22 @@ class PaymentScreen extends ConsumerStatefulWidget {
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _cardNumberController = TextEditingController();
-  final _expiryController = TextEditingController();
-  final _cvvController = TextEditingController();
-  final _nameController = TextEditingController();
 
   bool _isProcessing = false;
-  String? _selectedPaymentMethod = 'card';
+  String? _selectedPaymentMethod = 'upi';
   int _selectedPlanIndex = 0; // Track selected payment plan
+  XFile? _paymentProofImage;
+
+  // Payment details constants
+  static const String upiId = 'learnedplatform@paytm';
+  static const String bankAccountName = 'LearnED Platform';
+  static const String bankAccountNumber = '1234567890';
+  static const String ifscCode = 'SBIN0001234';
+  static const String bankName = 'State Bank of India';
+  static const String bankBranch = 'Main Branch';
 
   @override
   void dispose() {
-    _cardNumberController.dispose();
-    _expiryController.dispose();
-    _cvvController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -254,22 +259,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       const SizedBox(height: 16),
                       RadioListTile<String>(
                         title: const Row(
-                          children: [Icon(Icons.credit_card), SizedBox(width: 8), Text('Credit/Debit Card')],
+                          children: [Icon(Icons.account_balance_wallet), SizedBox(width: 8), Text('UPI Payment')],
                         ),
-                        value: 'card',
-                        groupValue: _selectedPaymentMethod,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedPaymentMethod = value;
-                          });
-                        },
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      RadioListTile<String>(
-                        title: const Row(
-                          children: [Icon(Icons.account_balance_wallet), SizedBox(width: 8), Text('PayPal')],
-                        ),
-                        value: 'paypal',
+                        value: 'upi',
                         groupValue: _selectedPaymentMethod,
                         onChanged: (value) {
                           setState(() {
@@ -282,7 +274,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         title: const Row(
                           children: [Icon(Icons.account_balance), SizedBox(width: 8), Text('Bank Transfer')],
                         ),
-                        value: 'bank',
+                        value: 'bank_transfer',
                         groupValue: _selectedPaymentMethod,
                         onChanged: (value) {
                           setState(() {
@@ -298,130 +290,240 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
               const SizedBox(height: 24),
 
-              // Payment Details (Card)
-              if (_selectedPaymentMethod == 'card') ...[
+              // Payment Details
+              if (_selectedPaymentMethod == 'upi') ...[
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Card Details', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(labelText: 'Cardholder Name', border: OutlineInputBorder()),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter cardholder name';
-                            }
-                            return null;
-                          },
+                        Text(
+                          'UPI Payment Details',
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _cardNumberController,
-                          decoration: const InputDecoration(
-                            labelText: 'Card Number',
-                            border: OutlineInputBorder(),
-                            hintText: '1234 5678 9012 3456',
+
+                        // UPI ID Display with copy and open functionality
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.primary, width: 2),
                           ),
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.length < 16) {
-                              return 'Please enter a valid card number';
-                            }
-                            return null;
-                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Pay to this UPI ID:',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () => _launchUPI(),
+                                      child: Text(
+                                        upiId,
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          color: theme.colorScheme.primary,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.copy, color: theme.colorScheme.primary),
+                                    onPressed: () {
+                                      Clipboard.setData(const ClipboardData(text: upiId));
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(const SnackBar(content: Text('UPI ID copied to clipboard')));
+                                    },
+                                    tooltip: 'Copy UPI ID',
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tap on the UPI ID to open your payment app',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        Text(
+                          'Amount: ₹${price.toStringAsFixed(2)}',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              if (_selectedPaymentMethod == 'bank_transfer') ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bank Transfer Details',
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
+
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.secondary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.secondary, width: 2),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildBankDetailRow('Account Name', bankAccountName, theme),
+                              const Divider(height: 16),
+                              _buildBankDetailRow('Account Number', bankAccountNumber, theme),
+                              const Divider(height: 16),
+                              _buildBankDetailRow('IFSC Code', ifscCode, theme),
+                              const Divider(height: 16),
+                              _buildBankDetailRow('Bank Name', bankName, theme),
+                              const Divider(height: 16),
+                              _buildBankDetailRow('Branch', bankBranch, theme),
+                              const Divider(height: 16),
+                              _buildBankDetailRow('Amount', '₹${price.toStringAsFixed(2)}', theme),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // Payment Proof Upload
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Upload Payment Proof',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Upload a screenshot of your payment confirmation',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '* Required - Payment cannot be submitted without proof',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Display selected image or placeholder
+                      if (_paymentProofImage != null) ...[
+                        Container(
+                          height: 200,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.outline),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(File(_paymentProofImage!.path), fit: BoxFit.cover),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             Expanded(
-                              child: TextFormField(
-                                controller: _expiryController,
-                                decoration: const InputDecoration(
-                                  labelText: 'MM/YY',
-                                  border: OutlineInputBorder(),
-                                  hintText: '12/25',
-                                ),
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value == null || value.length < 5) {
-                                    return 'Invalid expiry';
-                                  }
-                                  return null;
-                                },
+                              child: OutlinedButton.icon(
+                                onPressed: () => _pickPaymentProof(ImageSource.gallery),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Change Image'),
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
+                            IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _paymentProofImage = null;
+                                });
+                              },
+                              icon: const Icon(Icons.delete),
+                              tooltip: 'Remove',
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Container(
+                          height: 150,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: theme.colorScheme.outline, style: BorderStyle.solid),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cloud_upload, size: 48, color: theme.colorScheme.primary),
+                              const SizedBox(height: 8),
+                              Text('No image selected', style: theme.textTheme.bodyMedium),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
                             Expanded(
-                              child: TextFormField(
-                                controller: _cvvController,
-                                decoration: const InputDecoration(
-                                  labelText: 'CVV',
-                                  border: OutlineInputBorder(),
-                                  hintText: '123',
-                                ),
-                                keyboardType: TextInputType.number,
-                                obscureText: true,
-                                validator: (value) {
-                                  if (value == null || value.length < 3) {
-                                    return 'Invalid CVV';
-                                  }
-                                  return null;
-                                },
+                              child: FilledButton.icon(
+                                onPressed: () => _pickPaymentProof(ImageSource.gallery),
+                                icon: const Icon(Icons.photo_library),
+                                label: const Text('Choose from Gallery'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: () => _pickPaymentProof(ImageSource.camera),
+                                icon: const Icon(Icons.camera_alt),
+                                label: const Text('Take Photo'),
                               ),
                             ),
                           ],
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
+              ),
 
-              // Other Payment Methods
-              if (_selectedPaymentMethod == 'paypal') ...[
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        Icon(Icons.account_balance_wallet, size: 64, color: theme.colorScheme.primary),
-                        const SizedBox(height: 16),
-                        Text(
-                          'You will be redirected to PayPal to complete your payment.',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyLarge,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-
-              if (_selectedPaymentMethod == 'bank') ...[
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        Icon(Icons.account_balance, size: 64, color: theme.colorScheme.primary),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Bank transfer instructions will be sent to your email after confirming the enrollment.',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyLarge,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
+              const SizedBox(height: 24),
 
               // Process Payment Button
               SizedBox(
@@ -430,8 +532,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   onPressed: _isProcessing ? null : _processPayment,
                   icon: _isProcessing
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.payment),
-                  label: Text(_isProcessing ? 'Processing...' : 'Pay \$${price.toStringAsFixed(2)}'),
+                      : const Icon(Icons.upload),
+                  label: Text(_isProcessing ? 'Submitting...' : 'Submit Payment'),
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                 ),
               ),
@@ -466,7 +568,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Future<void> _processPayment() async {
-    if (_selectedPaymentMethod == 'card' && !_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_paymentProofImage == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please upload payment proof'), backgroundColor: Colors.red));
       return;
     }
 
@@ -475,11 +584,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     });
 
     try {
-
-      // Simulate instant payment processing (bypassed for testing)
-      await Future.delayed(const Duration(milliseconds: 500));
-
-
       // Get pricing info based on selected plan
       final pricingList = widget.classroom['classroom_pricing'] as List?;
       final pricingInfo = pricingList != null && pricingList.isNotEmpty
@@ -488,59 +592,67 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final price = pricingInfo?['price'] ?? 0.0;
       final paymentPlan = pricingInfo?['payment_plans'] as Map<String, dynamic>?;
 
-
-      // Enroll student (mock student ID for now)
-      final classroomService = ClassroomService();
-
-      await classroomService.enrollStudent(
-        studentId: null, // Use authenticated student ID
+      // Create pending payment with proof
+      final paymentService = PaymentService();
+      final result = await paymentService.createPendingPayment(
         classroomId: widget.classroom['id'],
         paymentPlanId: paymentPlan?['id'] ?? 'default-plan',
-        amountPaid: price.toDouble(),
+        amount: price.toDouble(),
+        paymentMethod: _selectedPaymentMethod ?? 'upi',
+        proofImage: _paymentProofImage!,
+        transactionId: null, // Transaction ID will be added by admin during verification
       );
 
-
       if (mounted) {
-        // Show success dialog
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            icon: const Icon(Icons.check_circle, color: Colors.green, size: 64),
-            title: const Text('Payment Successful!'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Welcome to ${widget.classroom['name']}!', textAlign: TextAlign.center),
-                const SizedBox(height: 8),
-                const Text(
-                  'You have been successfully enrolled. You will receive a confirmation email shortly.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Amount: \$${price.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
+        if (result['success'] == true) {
+          // Show success dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              icon: const Icon(Icons.pending_actions, color: Colors.orange, size: 64),
+              title: const Text('Payment Submitted!'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Your payment for ${widget.classroom['name']} has been submitted for verification.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'You will be notified once the admin verifies your payment. This usually takes 1-2 business days.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Amount: ₹${price.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    // Invalidate providers to refresh data
+                    ref.invalidate(enrolledClassroomsProvider);
+                    ref.invalidate(studentEnrollmentStatsProvider);
+                    ref.invalidate(currentStudentProfileProvider);
+
+                    context.pop(); // Close dialog
+                    context.go('/student/sessions'); // Navigate to My Classes
+                  },
+                  child: const Text('OK'),
                 ),
               ],
             ),
-            actions: [
-              FilledButton(
-                onPressed: () {
-                  // Invalidate providers to refresh data
-                  ref.invalidate(enrolledClassroomsProvider);
-                  ref.invalidate(studentEnrollmentStatsProvider);
-                  ref.invalidate(currentStudentProfileProvider);
-
-                  context.pop(); // Close dialog
-                  context.go('/student/sessions'); // Navigate to My Classes
-                },
-                child: const Text('View My Classes'),
-              ),
-            ],
-          ),
-        );
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment submission failed: ${result['error']}'), backgroundColor: Colors.red),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -555,5 +667,82 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         });
       }
     }
+  }
+
+  // Helper method to pick payment proof image
+  Future<void> _pickPaymentProof(ImageSource source) async {
+    try {
+      final paymentService = PaymentService();
+      final image = await paymentService.pickPaymentProof(source: source);
+      if (image != null) {
+        setState(() {
+          _paymentProofImage = image;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  // Helper method to launch UPI app
+  Future<void> _launchUPI() async {
+    final url = Uri.parse(
+      'upi://pay?pa=$upiId&pn=$bankAccountName&cu=INR&am=${widget.classroom['classroom_pricing']?[_selectedPlanIndex]?['price'] ?? 0}',
+    );
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback: Copy UPI ID to clipboard
+        await Clipboard.setData(const ClipboardData(text: upiId));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('UPI ID copied to clipboard. Please open your payment app manually.')),
+          );
+        }
+      }
+    } catch (e) {
+      // Fallback: Copy UPI ID to clipboard
+      await Clipboard.setData(const ClipboardData(text: upiId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('UPI ID copied to clipboard')));
+      }
+    }
+  }
+
+  // Helper method to build bank detail rows
+  Widget _buildBankDetailRow(String label, String value, ThemeData theme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurface),
+        ),
+        Row(
+          children: [
+            Text(
+              value,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: value));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label copied to clipboard')));
+              },
+              child: Icon(Icons.copy, size: 16, color: theme.colorScheme.primary),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

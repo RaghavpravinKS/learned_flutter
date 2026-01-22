@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:learned_flutter/features/student/providers/classroom_provider.dart';
 import 'package:learned_flutter/features/student/providers/assignment_provider.dart';
 import 'package:learned_flutter/features/student/providers/learning_materials_provider.dart';
@@ -91,6 +92,10 @@ class ClassroomHomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16.0),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
+              // Subscription Status Card
+              _buildSubscriptionCard(context, ref),
+              const SizedBox(height: 16),
+
               // Welcome Card
               Card(
                 child: Padding(
@@ -143,6 +148,160 @@ class ClassroomHomeScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSubscriptionCard(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final enrollmentAsync = ref.watch(enrollmentDetailsProvider(classroomId));
+
+    return enrollmentAsync.when(
+      loading: () => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text('Loading subscription details...', style: theme.textTheme.bodyMedium),
+            ],
+          ),
+        ),
+      ),
+      error: (error, stack) => const SizedBox.shrink(), // Hide if error
+      data: (enrollment) {
+        if (enrollment == null) {
+          return const SizedBox.shrink(); // Hide if no enrollment data
+        }
+
+        final expireAt = enrollment['expire_at'] as String?;
+        final paymentPlan = enrollment['payment_plans'] as Map<String, dynamic>?;
+
+        if (expireAt == null) {
+          return const SizedBox.shrink(); // Hide if no expiry date
+        }
+
+        final expiryDate = DateTime.parse(expireAt);
+        final now = DateTime.now();
+        final daysUntilExpiry = expiryDate.difference(now).inDays;
+
+        // Determine card color based on days remaining
+        Color cardColor;
+        Color textColor;
+        IconData icon;
+        String statusText;
+
+        if (daysUntilExpiry < 0) {
+          // Expired
+          cardColor = Colors.red.shade50;
+          textColor = Colors.red.shade700;
+          icon = Icons.error_outline;
+          statusText = 'Subscription Expired';
+        } else if (daysUntilExpiry <= 7) {
+          // Expiring soon
+          cardColor = Colors.orange.shade50;
+          textColor = Colors.orange.shade700;
+          icon = Icons.warning_amber_rounded;
+          statusText = 'Expiring Soon';
+        } else if (daysUntilExpiry <= 30) {
+          // Expiring this month
+          cardColor = Colors.yellow.shade50;
+          textColor = Colors.orange.shade800;
+          icon = Icons.schedule;
+          statusText = 'Active';
+        } else {
+          // Active with plenty of time
+          cardColor = Colors.green.shade50;
+          textColor = Colors.green.shade700;
+          icon = Icons.check_circle;
+          statusText = 'Active';
+        }
+
+        final formattedExpiry = DateFormat('MMM dd, yyyy').format(expiryDate);
+        final planName = paymentPlan?['name'] ?? 'Standard Plan';
+
+        return Card(
+          color: cardColor,
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: textColor, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            statusText,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(planName, style: theme.textTheme.bodySmall?.copyWith(color: textColor.withOpacity(0.8))),
+                        ],
+                      ),
+                    ),
+                    if (daysUntilExpiry >= 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: textColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          daysUntilExpiry == 0
+                              ? 'Today'
+                              : daysUntilExpiry == 1
+                              ? '1 day left'
+                              : '$daysUntilExpiry days left',
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Valid Until',
+                          style: theme.textTheme.bodySmall?.copyWith(color: textColor.withOpacity(0.7)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formattedExpiry,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                      ],
+                    ),
+                    if (daysUntilExpiry <= 7)
+                      FilledButton.icon(
+                        onPressed: () {
+                          // Navigate to renewal/payment screen
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(const SnackBar(content: Text('Renewal feature coming soon!')));
+                        },
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Renew'),
+                        style: FilledButton.styleFrom(backgroundColor: textColor, foregroundColor: Colors.white),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -920,7 +1079,6 @@ class ClassroomHomeScreen extends ConsumerWidget {
     }
 
     try {
-
       // Extract the file path from the stored URL
       // The URL might be in format: https://[project].supabase.co/storage/v1/object/public/learning-materials/[path]
       // We need to extract the path after 'learning-materials/'
@@ -962,8 +1120,7 @@ class ClassroomHomeScreen extends ConsumerWidget {
         if (!launchedExternal && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open file')));
         }
-      } else {
-      }
+      } else {}
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening file: $e')));
@@ -980,7 +1137,6 @@ class ClassroomHomeScreen extends ConsumerWidget {
     }
 
     try {
-
       // Extract the file path from the stored URL
       String? filePath;
       final storedUrl = material.fileUrl!;

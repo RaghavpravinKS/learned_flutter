@@ -15,14 +15,11 @@ class ClassroomListScreen extends ConsumerStatefulWidget {
 
 class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
   final _searchController = TextEditingController();
-  String _selectedSubject = 'All';
 
   // Student's grade and board - automatically detected from user profile
   String? _studentBoard;
   int? _studentGrade;
   bool _isLoadingProfile = true;
-
-  final List<String> _subjects = ['All', 'Mathematics', 'Physics', 'Chemistry', 'Biology'];
 
   @override
   void initState() {
@@ -40,7 +37,7 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
             .select('grade_level, board')
             .eq('user_id', user.id)
             .single();
-        
+
         if (mounted) {
           setState(() {
             _studentGrade = studentData['grade_level'] as int?;
@@ -48,7 +45,6 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
             _isLoadingProfile = false;
           });
         }
-
       } catch (e) {
         // Fallback to auth metadata if DB fetch fails
         if (mounted) {
@@ -86,7 +82,6 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
         elevation: 0,
         title: const Text('Find a Classroom'),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog)],
       ),
       body: Column(
         children: [
@@ -123,14 +118,6 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
                   if (_studentGrade != null) {
                     final gradeLevel = classroom['grade_level'] as int?;
                     if (gradeLevel != _studentGrade) {
-                      return false;
-                    }
-                  }
-
-                  // MANUAL FILTER: Subject (optional - user selected)
-                  if (_selectedSubject != 'All') {
-                    final subject = (classroom['subject'] ?? '').toString().toLowerCase();
-                    if (!subject.contains(_selectedSubject.toLowerCase())) {
                       return false;
                     }
                   }
@@ -359,88 +346,6 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Future<void> _showFilterDialog() async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Filter Classrooms'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Info box showing automatic filters
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 18, color: Colors.blue.shade700),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Auto-filtered for you',
-                            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blue.shade700, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      if (_studentGrade != null) Text('• Grade: $_studentGrade', style: const TextStyle(fontSize: 12)),
-                      if (_studentBoard != null) Text('• Board: $_studentBoard', style: const TextStyle(fontSize: 12)),
-                      if (_studentGrade == null && _studentBoard == null)
-                        const Text(
-                          'Complete your profile to see personalized classrooms',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('Additional Filters', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _selectedSubject,
-                  decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
-                  items: _subjects.map((subject) {
-                    return DropdownMenuItem(value: subject, child: Text(subject));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedSubject = value!;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Trigger a rebuild with new filters
-                setState(() {});
-              },
-              child: const Text('Apply'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

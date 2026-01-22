@@ -29,6 +29,7 @@ class AppRoutes {
   static const String studentSessionJoin = '$student/session/join';
   static const String studentSessionActive = '$student/session/active';
   static const String studentSessionFeedback = '$student/session/feedback';
+  static const String studentPaymentHistory = '$student/payments';
 
   // Teacher routes
   static const String teacher = '/teacher';

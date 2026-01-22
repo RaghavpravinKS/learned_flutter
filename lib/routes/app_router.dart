@@ -27,6 +27,7 @@ import 'package:learned_flutter/features/student/screens/join_session_screen.dar
 import 'package:learned_flutter/features/student/screens/active_session_screen.dart';
 import 'package:learned_flutter/features/student/screens/session_feedback_screen.dart';
 import 'package:learned_flutter/features/student/screens/progress_screen.dart';
+import 'package:learned_flutter/features/student/screens/payment_history_screen.dart';
 import 'package:learned_flutter/features/student/screens/learning_materials_screen.dart';
 import 'package:learned_flutter/features/student/models/session_model.dart';
 import 'package:learned_flutter/features/student/screens/material_viewer_screen.dart';
@@ -188,6 +189,12 @@ final router = GoRouter(
         GoRoute(
           path: 'progress',
           pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ProgressScreen()),
+        ),
+
+        // Payment History
+        GoRoute(
+          path: 'payments',
+          pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const PaymentHistoryScreen()),
         ),
 
         // Learning Materials

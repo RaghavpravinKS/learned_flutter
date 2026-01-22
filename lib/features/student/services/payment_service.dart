@@ -1,7 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'student_service.dart';
 
 class PaymentService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final StudentService _studentService = StudentService();
 
   // Process payment and return transaction details
   Future<Map<String, dynamic>> processPayment({
@@ -13,7 +16,6 @@ class PaymentService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-
       // Generate transaction ID
       final transactionId = 'txn_${DateTime.now().millisecondsSinceEpoch}_${studentId.substring(0, 8)}';
 
@@ -39,13 +41,12 @@ class PaymentService {
           metadata: metadata,
         );
 
-
         return {
           'success': true,
           'payment_id': paymentId,
           'transaction_id': transactionId,
           'amount': amount,
-          'currency': 'USD',
+          'currency': 'INR',
           'payment_method': paymentMethod,
           'status': 'completed',
           'created_at': DateTime.now().toIso8601String(),
@@ -75,7 +76,7 @@ class PaymentService {
       'student_id': studentId,
       'classroom_id': classroomId,
       'amount': amount,
-      'currency': 'USD',
+      'currency': 'INR',
       'payment_method': paymentMethod,
       'transaction_id': transactionId,
       'status': 'completed',
@@ -94,7 +95,7 @@ class PaymentService {
       'payment_id': 'pay_sim_${DateTime.now().millisecondsSinceEpoch}',
       'transaction_id': transactionId,
       'amount': amount,
-      'currency': 'USD',
+      'currency': 'INR',
       'payment_method': paymentMethod,
       'status': 'completed',
       'created_at': DateTime.now().toIso8601String(),
@@ -109,7 +110,6 @@ class PaymentService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-
       // Call the database function to handle payment completion
       final result = await _supabase.rpc(
         'handle_payment_completion',
@@ -130,7 +130,6 @@ class PaymentService {
   // Get payment history for a student
   Future<List<Map<String, dynamic>>> getPaymentHistory(String studentId) async {
     try {
-
       final payments = await _supabase
           .from('payments')
           .select('''
@@ -147,7 +146,7 @@ class PaymentService {
         {
           'id': 'pay_example_1',
           'amount': 99.99,
-          'currency': 'USD',
+          'currency': 'INR',
           'payment_method': 'stripe',
           'status': 'completed',
           'created_at': DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
@@ -164,7 +163,6 @@ class PaymentService {
     String? reason,
   }) async {
     try {
-
       // In a real implementation, you would call the payment provider's refund API
       // For now, simulate the refund process
 
@@ -203,6 +201,144 @@ class PaymentService {
       }
     } catch (e) {
       return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Create a pending payment record with proof upload
+  Future<Map<String, dynamic>> createPendingPayment({
+    required String classroomId,
+    required String paymentPlanId,
+    required double amount,
+    required String paymentMethod, // 'upi' or 'bank_transfer'
+    required XFile proofImage,
+    String? transactionId,
+  }) async {
+    try {
+      // Get current authenticated student
+      final studentId = await _studentService.getCurrentStudentId();
+      if (studentId == null) {
+        throw Exception('No authenticated student found');
+      }
+
+      // Upload payment proof to storage
+      final proofPath = await _uploadPaymentProof(studentId: studentId, imageFile: proofImage);
+
+      // Create payment record with pending status
+      final paymentData = {
+        'student_id': studentId,
+        'classroom_id': classroomId,
+        'payment_plan_id': paymentPlanId,
+        'amount': amount,
+        'currency': 'INR',
+        'payment_method': paymentMethod,
+        'transaction_id': transactionId,
+        'status': 'pending', // Set to pending for admin verification
+        'payment_proof_path': proofPath,
+        // expire_at will be set by admin, not automatically
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      final response = await _supabase.from('payments').insert(paymentData).select().single();
+
+      return {'success': true, 'payment_id': response['id'], 'message': 'Payment submitted for verification'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Upload payment proof image to storage with unique naming
+  Future<String> _uploadPaymentProof({required String studentId, required XFile imageFile}) async {
+    try {
+      // Generate unique filename using timestamp and random component
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = imageFile.path.split('.').last;
+      final fileName = 'payment_proof_${timestamp}_${DateTime.now().microsecond}.$extension';
+
+      // Create storage path: payment-proofs/{user_id}/{payment_id}/{filename}
+      // Since we don't have payment_id yet, we use timestamp-based folder
+      final storagePath = '$studentId/${timestamp}_${DateTime.now().microsecond}/$fileName';
+
+      // Read file bytes
+      final bytes = await imageFile.readAsBytes();
+
+      // Upload to Supabase storage
+      await _supabase.storage.from('payment-proofs').uploadBinary(storagePath, bytes);
+
+      return storagePath;
+    } catch (e) {
+      throw Exception('Failed to upload payment proof: $e');
+    }
+  }
+
+  /// Get payment proof signed URL (valid for 1 hour)
+  Future<String> getPaymentProofUrl(String storagePath) async {
+    try {
+      // Use createSignedUrl for private buckets instead of getPublicUrl
+      final url = await _supabase.storage.from('payment-proofs').createSignedUrl(storagePath, 3600); // 1 hour expiry
+      return url;
+    } catch (e) {
+      throw Exception('Failed to get payment proof URL: $e');
+    }
+  }
+
+  /// Get student's pending payments
+  Future<List<Map<String, dynamic>>> getPendingPayments() async {
+    try {
+      final studentId = await _studentService.getCurrentStudentId();
+      if (studentId == null) {
+        return [];
+      }
+
+      final response = await _supabase
+          .from('payments')
+          .select('''
+            *,
+            classrooms(id, name, subject, grade_level),
+            payment_plans(name, billing_cycle)
+          ''')
+          .eq('student_id', studentId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      throw Exception('Failed to fetch pending payments: $e');
+    }
+  }
+
+  /// Get all payments for the current student
+  Future<List<Map<String, dynamic>>> getStudentPayments() async {
+    try {
+      final studentId = await _studentService.getCurrentStudentId();
+      if (studentId == null) {
+        return [];
+      }
+
+      final response = await _supabase
+          .from('payments')
+          .select('''
+            *,
+            classrooms(id, name, subject, grade_level),
+            payment_plans(name, billing_cycle)
+          ''')
+          .eq('student_id', studentId)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      throw Exception('Failed to fetch student payments: $e');
+    }
+  }
+
+  /// Pick image from gallery or camera
+  Future<XFile?> pickPaymentProof({required ImageSource source}) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: source, maxWidth: 1920, maxHeight: 1920, imageQuality: 85);
+      return image;
+    } catch (e) {
+      throw Exception('Failed to pick image: $e');
     }
   }
 }

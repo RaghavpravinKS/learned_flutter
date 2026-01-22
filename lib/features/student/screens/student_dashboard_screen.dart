@@ -195,6 +195,14 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
           _buildDrawerItem(icon: Icons.school_outlined, title: 'My Classes', section: DrawerSection.myClasses),
           _buildDrawerItem(icon: Icons.schedule_outlined, title: 'Schedule', section: DrawerSection.schedule),
           _buildDrawerItem(icon: Icons.person_outline, title: 'Profile', section: DrawerSection.profile),
+          ListTile(
+            leading: const Icon(Icons.payment_outlined),
+            title: const Text('Payment History'),
+            onTap: () {
+              Navigator.pop(context);
+              context.go(AppRoutes.studentPaymentHistory);
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
