@@ -155,7 +155,6 @@ class _PaymentCardState extends State<_PaymentCard> {
     final theme = Theme.of(context);
     final status = widget.payment['status'] as String?;
     final amount = widget.payment['amount'] ?? 0.0;
-    final currency = widget.payment['currency'] ?? 'INR';
     final classroom = widget.payment['classrooms'] as Map<String, dynamic>?;
     final paymentPlan = widget.payment['payment_plans'] as Map<String, dynamic>?;
     final createdAt = widget.payment['created_at'] as String?;
@@ -223,7 +222,7 @@ class _PaymentCardState extends State<_PaymentCard> {
                       Icon(Icons.currency_rupee, size: 20, color: theme.colorScheme.onPrimaryContainer),
                       const SizedBox(width: 4),
                       Text(
-                        '${amount.toStringAsFixed(2)} $currency',
+                        amount.toStringAsFixed(2),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onPrimaryContainer,

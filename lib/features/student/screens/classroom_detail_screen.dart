@@ -128,7 +128,7 @@ class ClassroomDetailScreen extends ConsumerWidget {
                             Text('Starting from', style: theme.textTheme.bodySmall),
                           if (pricingList != null && pricingList.isNotEmpty)
                             Text(
-                              '\$${_getLowestPrice(pricingList).toStringAsFixed(2)}',
+                              '₹${_getLowestPrice(pricingList).toStringAsFixed(2)}',
                               style: theme.textTheme.headlineSmall?.copyWith(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold,
@@ -289,7 +289,7 @@ class ClassroomDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '\$${price.toStringAsFixed(2)}',
+                                '₹${price.toStringAsFixed(2)}',
                                 style: theme.textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.primary,
