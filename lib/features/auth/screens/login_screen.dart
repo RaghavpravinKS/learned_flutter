@@ -87,6 +87,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         throw Exception('Failed to sign in');
       }
 
+      // Check email_verified field from database
+      final supabase = Supabase.instance.client;
+      final userData = await supabase.from('users').select('email_verified').eq('id', response.user!.id).single();
+
+      final isEmailVerified = userData['email_verified'] as bool? ?? false;
+
+      if (!isEmailVerified) {
+        // Email not verified - sign out and redirect to verification
+        await supabase.auth.signOut();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please verify your email before logging in. Check your inbox for the verification code.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 5),
+            ),
+          );
+          context.go('/verify-email?email=${Uri.encodeComponent(email)}');
+        }
+        return;
+      }
+
       // Navigate based on user type
       if (mounted) {
         // Show success message

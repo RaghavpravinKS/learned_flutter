@@ -20,6 +20,30 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   bool _obscureConfirmPassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _validateSession();
+  }
+
+  Future<void> _validateSession() async {
+    final supabase = Supabase.instance.client;
+    final session = supabase.auth.currentSession;
+
+    if (session == null) {
+      // No valid session - redirect to login
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session expired. Please request a new password reset.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        context.go('/login');
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -78,8 +102,37 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          // Show dialog asking if user wants to cancel
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Cancel Password Reset?'),
+              content: const Text('Are you sure you want to cancel? You will need to request a new reset code.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Continue')),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.go('/login');
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          );
+        }
+      },
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset Password')),
+      appBar: AppBar(title: const Text('Reset Password'), automaticallyImplyLeading: false),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
