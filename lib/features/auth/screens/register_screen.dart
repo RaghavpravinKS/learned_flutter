@@ -194,7 +194,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 // Logo and welcome text
                 Column(
                   children: [
-                    Icon(Icons.school_outlined, size: 60, color: Theme.of(context).colorScheme.primary),
+                    Image.asset('assets/icons/LearnED_logo_horizontal.png', height: 60, fit: BoxFit.contain),
                     const SizedBox(height: 16),
                     Text('Create an account', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),

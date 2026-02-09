@@ -84,7 +84,7 @@ dev_dependencies:
 flutter_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icons/app_icon.png"
+  image_path: "assets/icons/LearnED_logo.jpeg"
   
 flutter:
   uses-material-design: true

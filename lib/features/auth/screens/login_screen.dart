@@ -132,7 +132,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // Logo and welcome text
                 Column(
                   children: [
-                    Icon(Icons.school_outlined, size: 60, color: Theme.of(context).colorScheme.primary),
+                    Image.asset('assets/icons/LearnED_logo_horizontal.png', height: 60, fit: BoxFit.contain),
                     const SizedBox(height: 16),
                     Text('Welcome back!', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
@@ -181,30 +181,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            final email = _emailController.text.trim();
-                            if (email.isEmpty) {
-                              _showErrorSnackBar('Please enter your email first');
-                              return;
-                            }
-
-                            try {
-                              await _authService.resetPassword(email);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password reset email sent!'),
-                                    backgroundColor: AppColors.success,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              _handleAuthError(e);
-                            }
-                          },
+                    onPressed: _isLoading ? null : () => context.push('/forgot-password'),
                     child: Text('Forgot Password?', style: TextStyle(color: AppColors.primary)),
                   ),
                 ),

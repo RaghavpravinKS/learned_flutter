@@ -10,7 +10,6 @@ final classroomLearningMaterialsProvider = FutureProvider.family<List<LearningMa
   try {
     final supabase = Supabase.instance.client;
 
-
     // Fetch learning materials from Supabase
     final response = await supabase
         .from('learning_materials')
@@ -18,7 +17,6 @@ final classroomLearningMaterialsProvider = FutureProvider.family<List<LearningMa
         .eq('classroom_id', classroomId)
         .order('upload_date', ascending: false)
         .limit(10); // Get most recent 10 materials
-
 
     if (response.isEmpty) {
       return [];
@@ -28,7 +26,6 @@ final classroomLearningMaterialsProvider = FutureProvider.family<List<LearningMa
       final material = LearningMaterialModel.fromMap(item as Map<String, dynamic>);
       return material;
     }).toList();
-
 
     return materials;
   } catch (e, stackTrace) {
@@ -44,7 +41,6 @@ final recentClassroomMaterialsProvider = FutureProvider.family<List<LearningMate
   try {
     final supabase = Supabase.instance.client;
 
-
     // Fetch top 3 most recent learning materials
     final response = await supabase
         .from('learning_materials')
@@ -52,7 +48,6 @@ final recentClassroomMaterialsProvider = FutureProvider.family<List<LearningMate
         .eq('classroom_id', classroomId)
         .order('upload_date', ascending: false)
         .limit(3);
-
 
     if (response.isEmpty) {
       return [];
@@ -62,7 +57,6 @@ final recentClassroomMaterialsProvider = FutureProvider.family<List<LearningMate
       final material = LearningMaterialModel.fromMap(item as Map<String, dynamic>);
       return material;
     }).toList();
-
 
     return materials;
   } catch (e, stackTrace) {
@@ -77,31 +71,37 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
     final userId = supabase.auth.currentUser?.id;
 
     if (userId == null) {
+      print('DEBUG: User ID is null');
       return [];
     }
 
+    print('DEBUG: Fetching materials for user ID: $userId');
 
     // Get student's enrolled classrooms
     final studentResponse = await supabase.from('students').select('id').eq('user_id', userId).maybeSingle();
 
     if (studentResponse == null) {
+      print('DEBUG: No student record found for user');
       return [];
     }
 
     final studentId = studentResponse['id'] as String;
+    print('DEBUG: Student ID: $studentId');
 
-    // Get classroom IDs where student is enrolled
+    // Get classroom IDs where student is enrolled (only active enrollments)
     final enrollmentsResponse = await supabase
         .from('student_enrollments')
         .select('classroom_id')
-        .eq('student_id', studentId);
+        .eq('student_id', studentId)
+        .eq('status', 'active');
 
     if (enrollmentsResponse.isEmpty) {
+      print('DEBUG: No active enrollments found');
       return [];
     }
 
     final classroomIds = (enrollmentsResponse as List).map((e) => e['classroom_id'] as String).toList();
-
+    print('DEBUG: Found ${classroomIds.length} classroom(s): $classroomIds');
 
     // Fetch learning materials from all enrolled classrooms with classroom and teacher names
     final response = await supabase
@@ -116,6 +116,7 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
         .inFilter('classroom_id', classroomIds)
         .order('upload_date', ascending: false);
 
+    print('DEBUG: Found ${response.length} material(s)');
 
     if (response.isEmpty) {
       return [];
@@ -143,9 +144,12 @@ final allStudentMaterialsProvider = FutureProvider<List<LearningMaterialModel>>(
       return LearningMaterialModel.fromMap(materialMap);
     }).toList();
 
+    print('DEBUG: Successfully parsed ${materials.length} material(s)');
 
     return materials;
   } catch (e, stackTrace) {
+    print('DEBUG ERROR: $e');
+    print('DEBUG STACK: $stackTrace');
     rethrow;
   }
 });

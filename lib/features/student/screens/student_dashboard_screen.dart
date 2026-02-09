@@ -165,12 +165,12 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: AppColors.primary),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Profile info on the left
                 CircleAvatar(
-                  radius: 30,
+                  radius: 32,
                   backgroundColor: Colors.white,
                   backgroundImage: profileImageUrl != null && profileImageUrl.isNotEmpty
                       ? NetworkImage(profileImageUrl)
@@ -178,16 +178,33 @@ class _StudentDashboardScreenState extends ConsumerState<StudentDashboardScreen>
                   child: profileImageUrl == null || profileImageUrl.isEmpty
                       ? Text(
                           userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
                         )
                       : null,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  userName,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Student', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+                    ],
+                  ),
                 ),
-                Text('Student', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+                const SizedBox(width: 8),
+                // Logo on the right
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset('assets/icons/LearnED_logo.jpeg', height: 45, width: 45),
+                ),
               ],
             ),
           ),

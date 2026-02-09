@@ -76,7 +76,6 @@ class _SplashScreenState extends State<SplashScreen> {
       return metadataUserType;
     }
 
-
     // Fallback: Check database tables to determine user type
     try {
       // Check if user exists in teachers table
@@ -109,29 +108,31 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App logo/icon would go here
-            const Icon(Icons.school_outlined, size: 100, color: Colors.white),
-            const SizedBox(height: 24),
-            // App name
-            Text(
-              'LearnED',
-              style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+            // Horizontal logo
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+              child: Image.asset('assets/icons/LearnED_logo_horizontal.png', fit: BoxFit.contain, height: 80),
             ),
-            const SizedBox(height: 8),
-            // Tagline
-            Text('Empowering Education', style: GoogleFonts.poppins(fontSize: 16, color: Colors.white70)),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
             // Status text
-            Text(_statusText, style: GoogleFonts.poppins(fontSize: 14, color: Colors.white60)),
+            Text(
+              _statusText,
+              style: GoogleFonts.poppins(fontSize: 14, color: isDarkMode ? Colors.white60 : Colors.black54),
+            ),
             const SizedBox(height: 16),
             // Loading indicator
-            const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isDarkMode ? Colors.white : Theme.of(context).colorScheme.primary,
+              ),
+            ),
           ],
         ),
       ),

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Email Change - LearnED</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #F9FAFB;
+            color: #111827;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+        }
+        .header {
+            background: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+            padding: 40px 32px;
+            text-align: center;
+        }
+        .logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 16px;
+        }
+        .header-title {
+            color: #FFFFFF;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+        .content {
+            padding: 48px 32px;
+        }
+        .message {
+            font-size: 16px;
+            color: #4B5563;
+            line-height: 1.6;
+            margin: 0 0 32px 0;
+        }
+        .email-change-box {
+            background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+            border-radius: 8px;
+            padding: 24px;
+            margin: 24px 0;
+            border: 2px solid #E5E7EB;
+        }
+        .email-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 8px 0;
+        }
+        .email-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 16px 0;
+        }
+        .arrow {
+            text-align: center;
+            color: #E53935;
+            font-size: 24px;
+            margin: 16px 0;
+        }
+        .button-container {
+            text-align: center;
+            margin: 32px 0;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+            color: #FFFFFF;
+            padding: 16px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            box-shadow: 0 4px 6px rgba(229, 57, 53, 0.2);
+        }
+        .security-box {
+            background-color: #FEF2F2;
+            border-left: 4px solid #EF4444;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 24px 0;
+        }
+        .security-text {
+            font-size: 13px;
+            color: #991B1B;
+            margin: 0;
+            line-height: 1.5;
+        }
+        .footer {
+            background-color: #F9FAFB;
+            padding: 32px;
+            text-align: center;
+            border-top: 1px solid #E5E7EB;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #6B7280;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://ugphaeiqbfejnzpiqdty.supabase.co/storage/v1/object/public/app-assets/learned-logo-white.png" alt="LearnED" class="logo">
+            <h1 class="header-title">Confirm Email Change</h1>
+        </div>
+
+        <div class="content">
+            <p class="message">
+                You've requested to change the email address associated with your LearnED account. 
+                Please confirm this change by clicking the button below.
+            </p>
+
+            <div class="email-change-box">
+                {{ if .Email }}
+                <p class="email-label">Current Email</p>
+                <p class="email-value">{{ .Email }}</p>
+                {{ end }}
+                
+                <div class="arrow">⬇️</div>
+                
+                {{ if .NewEmail }}
+                <p class="email-label">New Email</p>
+                <p class="email-value">{{ .NewEmail }}</p>
+                {{ end }}
+            </div>
+
+            <div class="button-container">
+                <a href="{{ .ConfirmationURL }}" class="button">✉️ Confirm Email Change</a>
+            </div>
+
+            <div class="security-box">
+                <p class="security-text">
+                    <strong>Security Alert:</strong> If you didn't request this email change, please contact 
+                    our support team immediately. Your account security is important to us.
+                </p>
+            </div>
+
+            <p class="message" style="margin-top: 24px; font-size: 14px; color: #6B7280;">
+                Having trouble? Copy and paste this link:<br>
+                <span style="color: #E53935; word-break: break-all;">{{ .ConfirmationURL }}</span>
+            </p>
+        </div>
+
+        <div class="footer">
+            <p class="footer-text">
+                © 2026 LearnED. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -92,6 +93,9 @@ class ClassroomHomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16.0),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
+              // Expiry Alert Banner (if within 3 days)
+              _buildExpiryAlertBanner(context, ref),
+
               // Subscription Status Card
               _buildSubscriptionCard(context, ref),
               const SizedBox(height: 16),
@@ -151,6 +155,78 @@ class ClassroomHomeScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildExpiryAlertBanner(BuildContext context, WidgetRef ref) {
+    final enrollmentAsync = ref.watch(enrollmentDetailsProvider(classroomId));
+
+    return enrollmentAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stack) => const SizedBox.shrink(),
+      data: (enrollment) {
+        if (enrollment == null) {
+          return const SizedBox.shrink();
+        }
+
+        final expireAt = enrollment['expire_at'] as String?;
+        if (expireAt == null) {
+          return const SizedBox.shrink();
+        }
+
+        final expiryDate = DateTime.parse(expireAt);
+        final now = DateTime.now();
+        final daysUntilExpiry = expiryDate.difference(now).inDays;
+
+        // Only show banner if expiring within 3 days or expired
+        if (daysUntilExpiry > 3) {
+          return const SizedBox.shrink();
+        }
+
+        final isExpired = daysUntilExpiry < 0;
+        final backgroundColor = isExpired ? Colors.red.shade100 : Colors.orange.shade100;
+        final iconColor = isExpired ? Colors.red.shade700 : Colors.orange.shade700;
+        final textColor = isExpired ? Colors.red.shade900 : Colors.orange.shade900;
+
+        String message;
+        if (isExpired) {
+          message = '⚠️ Your subscription has expired. Renew now to continue accessing this classroom.';
+        } else if (daysUntilExpiry == 0) {
+          message = '⏰ Your subscription expires today! Renew now to avoid losing access.';
+        } else if (daysUntilExpiry == 1) {
+          message = '⏰ Your subscription expires tomorrow. Renew now to continue learning.';
+        } else {
+          message = '⏰ Your subscription expires in $daysUntilExpiry days. Consider renewing soon.';
+        }
+
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: iconColor.withOpacity(0.3), width: 2),
+              ),
+              child: Row(
+                children: [
+                  Icon(isExpired ? Icons.error : Icons.access_time, color: iconColor, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios, color: iconColor, size: 16),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSubscriptionCard(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final enrollmentAsync = ref.watch(enrollmentDetailsProvider(classroomId));
@@ -197,8 +273,14 @@ class ClassroomHomeScreen extends ConsumerWidget {
           textColor = Colors.red.shade700;
           icon = Icons.error_outline;
           statusText = 'Subscription Expired';
+        } else if (daysUntilExpiry <= 3) {
+          // Expires within 3 days - Critical warning
+          cardColor = Colors.red.shade50;
+          textColor = Colors.red.shade700;
+          icon = Icons.warning_amber_rounded;
+          statusText = 'Urgent: Expiring Soon';
         } else if (daysUntilExpiry <= 7) {
-          // Expiring soon
+          // Expires within 7 days - Warning
           cardColor = Colors.orange.shade50;
           textColor = Colors.orange.shade700;
           icon = Icons.warning_amber_rounded;
@@ -879,12 +961,58 @@ class ClassroomHomeScreen extends ConsumerWidget {
   }
 
   Future<void> _launchMeetingUrl(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      final uri = Uri.parse(url);
+
+      // Try different launch modes in order of preference
+      bool launched = false;
+
+      // First try: Platform default (usually opens in browser)
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (e) {
+        // If platform default fails, try external application
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          // If that fails too, try in-app browser as last resort
+          launched = await launchUrl(uri, mode: LaunchMode.inAppWebView);
+        }
+      }
+
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not open meeting link. Please install a web browser or copy the link manually.'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Copy Link',
+              textColor: Colors.white,
+              onPressed: () {
+                // Copy link to clipboard
+                Clipboard.setData(ClipboardData(text: url));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open meeting link')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Copy Link',
+              textColor: Colors.white,
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: url));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied to clipboard')));
+              },
+            ),
+          ),
+        );
       }
     }
   }
@@ -913,15 +1041,17 @@ class ClassroomHomeScreen extends ConsumerWidget {
                   ],
                 ),
                 TextButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final classroomAsync = ref.read(classroomDetailsProvider(classroomId));
                     final classroomName = classroomAsync.value?['name'] ?? 'Classroom';
-                    Navigator.of(context).push(
+                    await Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) =>
                             ClassroomMaterialsScreen(classroomId: classroomId, classroomName: classroomName),
                       ),
                     );
+                    // Refresh materials when returning from view all screen
+                    ref.invalidate(recentClassroomMaterialsProvider(classroomId));
                   },
                   child: Text('View All', style: TextStyle(color: AppColors.primary)),
                 ),

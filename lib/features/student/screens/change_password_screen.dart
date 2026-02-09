@@ -232,7 +232,13 @@ class _StudentChangePasswordScreenState extends State<StudentChangePasswordScree
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : Text('Change Password', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Change Password',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                 ),
               ),
 

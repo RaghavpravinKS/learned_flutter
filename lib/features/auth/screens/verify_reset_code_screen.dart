@@ -5,16 +5,16 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class EmailVerificationScreen extends ConsumerStatefulWidget {
+class VerifyResetCodeScreen extends ConsumerStatefulWidget {
   final String email;
 
-  const EmailVerificationScreen({super.key, required this.email});
+  const VerifyResetCodeScreen({super.key, required this.email});
 
   @override
-  ConsumerState<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
+  ConsumerState<VerifyResetCodeScreen> createState() => _VerifyResetCodeScreenState();
 }
 
-class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScreen> {
+class _VerifyResetCodeScreenState extends ConsumerState<VerifyResetCodeScreen> {
   bool _isLoading = false;
   bool _isResending = false;
   bool _hasResent = false;
@@ -27,18 +27,18 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     super.dispose();
   }
 
-  Future<void> _resendVerification() async {
+  Future<void> _resendCode() async {
     setState(() => _isResending = true);
 
     try {
       final supabase = Supabase.instance.client;
-      await supabase.auth.resend(type: OtpType.signup, email: widget.email);
+      await supabase.auth.resetPasswordForEmail(widget.email);
 
       if (mounted) {
         setState(() => _hasResent = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Verification code resent! Please check your email.'),
+            content: Text('Reset code resent! Please check your email.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 4),
           ),
@@ -57,7 +57,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     }
   }
 
-  Future<void> _verifyOtp() async {
+  Future<void> _verifyCode() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -67,13 +67,13 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
       final response = await supabase.auth.verifyOTP(
         email: widget.email,
         token: _otpController.text.trim(),
-        type: OtpType.signup,
+        type: OtpType.recovery,
       );
 
       if (mounted) {
         if (response.session != null) {
-          // Success - navigate to success screen
-          context.go('/email-verified');
+          // Success - navigate to reset password screen
+          context.go('/reset-password');
         } else {
           throw Exception('Verification failed');
         }
@@ -81,7 +81,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invalid or expired code. Please try again.'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Invalid or expired code. Please try again.'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -94,7 +94,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify Email')),
+      appBar: AppBar(title: const Text('Verify Reset Code')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -105,16 +105,16 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
               children: [
                 const SizedBox(height: 20),
                 // Header
-                Icon(Icons.mark_email_read_outlined, size: 80, color: Colors.red.shade600),
+                Icon(Icons.lock_reset, size: 80, color: Colors.red.shade600),
                 const SizedBox(height: 24),
                 Text(
-                  'Verify Your Email',
+                  'Reset Your Password',
                   style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.red.shade700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'We\'ve sent a verification code to:',
+                  'We\'ve sent a reset code to:',
                   style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey.shade700),
                   textAlign: TextAlign.center,
                 ),
@@ -140,7 +140,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Enter the 6-digit code from your email to verify your account',
+                          'Enter the 6-digit code from your email to continue',
                           style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700),
                         ),
                       ),
@@ -171,7 +171,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter the verification code';
+                      return 'Please enter the reset code';
                     }
                     if (value.length != 6) {
                       return 'Code must be 6 digits';
@@ -184,7 +184,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
 
                 // Verify Button
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _verifyOtp,
+                  onPressed: _isLoading ? null : _verifyCode,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red.shade600,
                     foregroundColor: Colors.white,
@@ -198,14 +198,14 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
                           height: 24,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : Text('Verify Email', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                      : Text('Verify Code', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
 
                 const SizedBox(height: 16),
 
                 // Resend Code Button
                 TextButton(
-                  onPressed: _isResending || _hasResent ? null : _resendVerification,
+                  onPressed: _isResending || _hasResent ? null : _resendCode,
                   child: _isResending
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : Text(

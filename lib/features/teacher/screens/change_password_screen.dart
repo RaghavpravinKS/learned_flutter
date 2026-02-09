@@ -228,7 +228,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text('Change Password', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Change Password',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                 ),
               ),
 

@@ -37,7 +37,7 @@ void main() async {
     await Supabase.initialize(
       url: Environment.supabaseUrl,
       anonKey: Environment.supabaseAnonKey,
-      authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce),
+      authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit),
     );
 
     runApp(const ProviderScope(child: LearnEDApp()));

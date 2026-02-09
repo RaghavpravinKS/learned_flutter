@@ -20,7 +20,17 @@ class AuthService {
     required String password,
     required Map<String, dynamic> userMetadata,
   }) async {
-    return await _supabase.auth.signUp(email: email, password: password, data: userMetadata);
+    return await _supabase.auth.signUp(
+      email: email,
+      password: password,
+      data: userMetadata,
+      emailRedirectTo: 'learnedapp://verify-email',
+    );
+  }
+
+  // Resend email verification
+  Future<void> resendEmailVerification(String email) async {
+    await _supabase.auth.resend(type: OtpType.signup, email: email);
   }
 
   // Sign in with email and password
@@ -39,15 +49,19 @@ class AuthService {
       // - Removing persistent auth state from secure storage
       // - Invalidating refresh tokens
       // - Triggering auth state change listeners
-
     } catch (e) {
       rethrow;
     }
   }
 
-  // Reset password
+  // Reset password - sends email with reset link
   Future<void> resetPassword(String email) async {
-    await _supabase.auth.resetPasswordForEmail(email);
+    await _supabase.auth.resetPasswordForEmail(email, redirectTo: 'learnedapp://reset-password');
+  }
+
+  // Update password (called after user clicks reset link)
+  Future<void> updatePassword(String newPassword) async {
+    await _supabase.auth.updateUser(UserAttributes(password: newPassword));
   }
 
   // Get user profile

@@ -116,7 +116,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         children: [
                           Text('Enrollment Fee', style: theme.textTheme.titleMedium),
                           Text(
-                            '\$${price.toStringAsFixed(2)}',
+                            '₹${price.toStringAsFixed(2)}',
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -141,7 +141,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         children: [
                           Text('Total', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                           Text(
-                            '\$${price.toStringAsFixed(2)}',
+                            '₹${price.toStringAsFixed(2)}',
                             style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: theme.colorScheme.primary,
@@ -204,7 +204,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                       ],
                                     ),
                                     secondary: Text(
-                                      '\$${planPrice.toStringAsFixed(2)}',
+                                      '₹${planPrice.toStringAsFixed(2)}',
                                       style: theme.textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: theme.colorScheme.primary,
@@ -231,7 +231,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                       ],
                                     ),
                                     trailing: Text(
-                                      '\$${planPrice.toStringAsFixed(2)}',
+                                      '₹${planPrice.toStringAsFixed(2)}',
                                       style: theme.textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: theme.colorScheme.primary,

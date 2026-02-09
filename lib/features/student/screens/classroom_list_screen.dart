@@ -321,7 +321,7 @@ class _ClassroomListScreenState extends ConsumerState<ClassroomListScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '\$${(price as num).toStringAsFixed(2)}/$billingCycle',
+                        '₹${(price as num).toStringAsFixed(2)}/$billingCycle',
                         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary),
                       ),
                       if (paymentPlan?['name'] != null)

@@ -105,7 +105,6 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'teachers/$teacherId/profile_$timestamp.jpg';
 
-
       final bytes = await _selectedImage!.readAsBytes();
 
       // Delete old file if exists (to avoid conflicts)
@@ -113,20 +112,17 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
         try {
           final oldFileName = _currentImageUrl!.split('/profile-images/').last;
           await Supabase.instance.client.storage.from('profile-images').remove([oldFileName]);
-        } catch (e) {
-        }
+        } catch (e) {}
       }
 
       final uploadResponse = await Supabase.instance.client.storage
           .from('profile-images')
           .uploadBinary(fileName, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg'));
 
-
       // Generate a signed URL (valid for 1 year) instead of public URL for better security
       final signedUrl = await Supabase.instance.client.storage
           .from('profile-images')
           .createSignedUrl(fileName, 31536000); // 1 year in seconds
-
 
       return signedUrl;
     } catch (e, stackTrace) {
@@ -135,7 +131,6 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -152,12 +147,10 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
       final teacherId = widget.teacherData['id'];
       final userId = widget.teacherData['users']['id'];
 
-
       // Split full name into first and last name
       final nameParts = _fullNameController.text.trim().split(' ');
       final firstName = nameParts.isNotEmpty ? nameParts.first : '';
       final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
 
       // Prepare users update data
       final usersUpdateData = {
@@ -167,7 +160,6 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
         'profile_image_url': imageUrl,
         'updated_at': DateTime.now().toIso8601String(),
       };
-
 
       // Update users table
       final usersResponse = await Supabase.instance.client
@@ -187,7 +179,6 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
             .toList();
       }
 
-
       // Prepare teachers update data
       final teachersUpdateData = {
         'bio': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
@@ -199,14 +190,12 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-
       // Update teachers table
       final teachersResponse = await Supabase.instance.client
           .from('teachers')
           .update(teachersUpdateData)
           .eq('id', teacherId)
           .select();
-
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -215,7 +204,6 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
         Navigator.pop(context, true);
       }
     } catch (e, stackTrace) {
-
       if (mounted) {
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(
@@ -374,7 +362,13 @@ class _EditTeacherProfileScreenState extends State<EditTeacherProfileScreen> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text('Save Changes', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Save Changes',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                 ),
               ),
             ],

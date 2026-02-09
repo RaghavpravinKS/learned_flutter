@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:learned_flutter/features/auth/screens/email_verification_screen.dart';
+import 'package:learned_flutter/features/auth/screens/email_verification_success_screen.dart';
 import 'package:learned_flutter/features/auth/screens/forgot_password_screen.dart';
+import 'package:learned_flutter/features/auth/screens/verify_reset_code_screen.dart';
 import 'package:learned_flutter/features/auth/screens/user_type_selection_screen.dart';
 import 'package:learned_flutter/features/auth/screens/login_screen.dart';
 import 'package:learned_flutter/features/auth/screens/reset_password_screen.dart';
@@ -119,6 +121,16 @@ final router = GoRouter(
       pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ForgotPasswordScreen()),
     ),
     GoRoute(
+      path: '/verify-reset-code',
+      pageBuilder: (context, state) {
+        final email = state.uri.queryParameters['email'] ?? '';
+        return MaterialPage(
+          key: state.pageKey,
+          child: VerifyResetCodeScreen(email: email),
+        );
+      },
+    ),
+    GoRoute(
       path: '/reset-password',
       pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const ResetPasswordScreen()),
     ),
@@ -131,6 +143,10 @@ final router = GoRouter(
           child: EmailVerificationScreen(email: email),
         );
       },
+    ),
+    GoRoute(
+      path: '/email-verified',
+      pageBuilder: (context, state) => MaterialPage(key: state.pageKey, child: const EmailVerificationSuccessScreen()),
     ),
     GoRoute(
       path: '/select-user-type',

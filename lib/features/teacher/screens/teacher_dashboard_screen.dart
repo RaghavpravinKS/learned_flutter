@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../services/teacher_service.dart';
@@ -153,7 +154,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           .order('start_time', ascending: true)
           .limit(10); // Get more and filter in code
 
-
       // Filter sessions to only include future ones
       final allSessions = List<Map<String, dynamic>>.from(response);
       final futureSessions = <Map<String, dynamic>>[];
@@ -169,7 +169,6 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
           int.parse(timeParts[0]),
           int.parse(timeParts[1]),
         );
-
 
         if (sessionDateTime.isAfter(now)) {
           futureSessions.add(session);
@@ -666,9 +665,7 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => ClassroomDetailScreen(classroomId: classroom['id']),
-                        ),
+                        MaterialPageRoute(builder: (context) => ClassroomDetailScreen(classroomId: classroom['id'])),
                       );
                     },
                   ),
@@ -786,8 +783,25 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         ),
         if (isLive && meetingUrl != null)
           ElevatedButton(
-            onPressed: () {
-              // TODO: Start session / open meeting URL
+            onPressed: () async {
+              try {
+                final url = Uri.parse(meetingUrl);
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                } else {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not open meeting URL'), behavior: SnackBarBehavior.floating),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error opening meeting: $e'), behavior: SnackBarBehavior.floating),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
             child: const Text('Start'),
@@ -823,27 +837,44 @@ class _TeacherDashboardScreenState extends ConsumerState<TeacherDashboardScreen>
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: Theme.of(context).primaryColor),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Profile info on the left
                 CircleAvatar(
-                  radius: 30,
+                  radius: 32,
                   backgroundColor: Colors.white,
                   backgroundImage: _profileImageUrl != null ? NetworkImage(_profileImageUrl!) : null,
                   child: _profileImageUrl == null
                       ? Text(
                           teacherName.isNotEmpty ? teacherName[0].toUpperCase() : 'T',
-                          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
                         )
                       : null,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  teacherName,
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        teacherName,
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Teacher', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+                    ],
+                  ),
                 ),
-                Text('Teacher', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+                const SizedBox(width: 8),
+                // Logo on the right
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset('assets/icons/LearnED_logo.jpeg', height: 45, width: 45),
+                ),
               ],
             ),
           ),

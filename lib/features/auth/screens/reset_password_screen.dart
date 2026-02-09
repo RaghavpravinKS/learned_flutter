@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -29,35 +30,43 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    
+
     try {
-      // TODO: Implement password reset logic with Supabase
-      // This would typically involve getting the access token from the URL
-      // and calling Supabase's updateUser method
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-      
+      final supabase = Supabase.instance.client;
+      final newPassword = _passwordController.text.trim();
+
+      // Update the user's password
+      await supabase.auth.updateUser(UserAttributes(password: newPassword));
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Password updated successfully!'),
+            content: Text('Password updated successfully! Please login with your new password.'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
           ),
         );
-        
+
+        // Sign out the user to force them to login with new password
+        await supabase.auth.signOut();
+
         // Navigate to login after a short delay
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            context.go('/login');
-          }
-        });
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          context.go('/login');
+        }
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Failed to update password';
+        if (e.toString().contains('session')) {
+          errorMessage = 'Session expired. Please request a new reset link.';
+        } else if (e.toString().contains('weak')) {
+          errorMessage = 'Password is too weak. Please use a stronger password.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red, duration: const Duration(seconds: 4)),
         );
       }
     } finally {
@@ -70,9 +79,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reset Password'),
-      ),
+      appBar: AppBar(title: const Text('Reset Password')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -85,25 +92,17 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 // Header
                 Text(
                   'Create New Password',
-                  style: GoogleFonts.poppins(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red.shade700,
-                  ),
+                  style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.red.shade700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Your new password must be different from previous used passwords',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    height: 1.5,
-                  ),
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade600, height: 1.5),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 40),
-                
+
                 // New Password Field
                 TextFormField(
                   controller: _passwordController,
@@ -112,18 +111,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     labelText: 'New Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      ),
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                       onPressed: () {
                         setState(() {
                           _obscurePassword = !_obscurePassword;
                         });
                       },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -136,7 +131,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Confirm New Password Field
                 TextFormField(
                   controller: _confirmPasswordController,
@@ -145,18 +140,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     labelText: 'Confirm New Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                      ),
+                      icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
                       onPressed: () {
                         setState(() {
                           _obscureConfirmPassword = !_obscureConfirmPassword;
                         });
                       },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -169,7 +160,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                   },
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Reset Password Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _submit,
@@ -177,30 +168,19 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                     backgroundColor: Colors.red.shade600,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text(
-                          'Reset Password',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      : const Text('Reset Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Back to Login
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -215,10 +195,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                       ),
                       child: Text(
                         'Sign In',
-                        style: TextStyle(
-                          color: Colors.red.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
