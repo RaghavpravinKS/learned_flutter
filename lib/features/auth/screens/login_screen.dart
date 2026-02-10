@@ -94,16 +94,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final isEmailVerified = userData['email_verified'] as bool? ?? false;
 
       if (!isEmailVerified) {
-        // Email not verified - sign out and redirect to verification
+        // Email not verified - resend verification code and redirect
+        try {
+          await supabase.auth.resend(type: OtpType.signup, email: email);
+        } catch (resendError) {
+          // If resend fails, continue with redirect anyway
+          print('Failed to resend verification code: $resendError');
+        }
+
+        // Sign out the user
         await supabase.auth.signOut();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Please verify your email before logging in. Check your inbox for the verification code.'),
+              content: Text(
+                'Please verify your email before logging in. A new verification code has been sent to your email.',
+              ),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 5),
+              duration: Duration(seconds: 6),
             ),
           );
           context.go('/verify-email?email=${Uri.encodeComponent(email)}');

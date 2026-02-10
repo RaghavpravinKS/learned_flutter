@@ -31,6 +31,25 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       final email = _emailController.text.trim();
       final supabase = Supabase.instance.client;
 
+      // Check if email exists in database
+      final userData = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+
+      if (userData == null) {
+        // Email doesn't exist
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No account found with this email address. Please sign up first.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Send password reset email (no verification check - having email access is verification enough)
       await supabase.auth.resetPasswordForEmail(email);
 
       if (mounted) {

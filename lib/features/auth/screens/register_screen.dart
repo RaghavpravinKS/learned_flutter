@@ -84,18 +84,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     String errorMessage = 'An error occurred during registration';
 
     if (error is AuthException) {
-      switch (error.statusCode) {
-        case '400':
-          errorMessage = 'Invalid email or password';
-          break;
-        case '422':
-          errorMessage = 'Invalid email format';
-          break;
-        case '429':
-          errorMessage = 'Too many requests. Please try again later.';
-          break;
-        default:
-          errorMessage = error.message;
+      // Handle specific Supabase Auth errors
+      if (error.message.toLowerCase().contains('already registered') ||
+          error.message.toLowerCase().contains('user already exists')) {
+        errorMessage = 'An account with this email already exists. Please login instead.';
+      } else {
+        switch (error.statusCode) {
+          case '400':
+            errorMessage = 'Invalid email or password';
+            break;
+          case '422':
+            errorMessage = 'Invalid email format';
+            break;
+          case '429':
+            errorMessage = 'Too many requests. Please try again later.';
+            break;
+          default:
+            errorMessage = error.message;
+        }
       }
     } else if (error is Exception) {
       errorMessage = error.toString().replaceAll('Exception: ', '');
@@ -124,6 +130,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final password = _passwordController.text;
       final firstName = _firstNameController.text.trim();
       final lastName = _lastNameController.text.trim();
+
+      // Check if email already exists using a database function (bypasses RLS)
+      // This prevents duplicate signups since Supabase Auth's signUp() will
+      // silently succeed and resend verification for existing unconfirmed users
+      final supabase = Supabase.instance.client;
+
+      final result = await supabase.rpc('check_email_exists', params: {'check_email': email});
+
+      if (result == true) {
+        // User already exists in database
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('An account with this email already exists. Please login instead.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
 
       // Create user metadata for Supabase Auth
       // Using separate first_name and last_name as expected by our trigger function

@@ -19,30 +19,20 @@ class WelcomeScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // App logo/icon
-                    Icon(
-                      Icons.school_outlined,
-                      size: 100,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    // App logo
+                    Image.asset('assets/icons/LearnED_logo_horizontal.png', height: 80, fit: BoxFit.contain),
                     const SizedBox(height: 16),
                     // Welcome text
                     Text(
                       'Welcome to LearnED',
-                      style: GoogleFonts.poppins(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
                     // Subtitle
                     Text(
                       'Your one-to-one learning platform for personalized education',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
+                      style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[600]),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -54,9 +44,7 @@ class WelcomeScreen extends StatelessWidget {
                   // Login button
                   FilledButton(
                     onPressed: () => context.go('/login'),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
+                    style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                     child: const Text('Log In'),
                   ),
                   const SizedBox(height: 16),
@@ -85,10 +73,7 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                         child: Text(
                           'Sign In',
-                          style: TextStyle(
-                            color: Colors.red.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
